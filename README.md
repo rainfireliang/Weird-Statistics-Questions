@@ -1,9 +1,8 @@
 # <div align="center">Weird Statistics Questions</div>
 
-<div align="center">Hai Liang</div>
-<div align="center">hailiang@cuhk.edu.hk</div>
-<div align="center">The Chinese University of Hong Kong</div>
-
+Hai Liang
+hailiang@cuhk.edu.hk
+The Chinese University of Hong Kong
 Answers to some "weird" statistics questions with R code
 
 ## I.	Descriptive Statistics
