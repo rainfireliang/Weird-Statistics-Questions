@@ -268,7 +268,7 @@ vcov(m2)
 
 They are different. Any implications?
 
-### 10. Why the I.I.D. assumption is essential? 
+### 10. Why is the I.I.D. assumption essential? 
 
 A regression model could be write as a combination of two parts: random part + systematic part. 
 
