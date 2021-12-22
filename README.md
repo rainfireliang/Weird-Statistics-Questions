@@ -26,7 +26,7 @@ Answers to some "weird" statistics questions with R code
 ### 15. Can we model the variance (instead of mean) of the dependent variable? E.g., the variance of the salary of elder people is smaller than the variance of the salary of young people, given equal salary.
 ### 16. What is wrong with using Z-statistics (and associated p-values) of the coefficient of a multiplicative term to test for a statistical interaction in nonlinear models with categorical dependent variables (e.g., logistic regression)?
 ## V.	Regression (Causal Inference)
-### 17. Everyone knows that correlation is not causation, when regression coefficients could be interpreted as causal effects? Is including the lagged explanatory variable a way to go?
+### 17. Everyone knows that correlation is not causation, when regression coefficients could be interpreted as causal effects? Is including the lagged explanatory variable a solution?
 ### 18. Is a random experiment always better than other methods to identify causality? Why or why not?
 ### 19. Is it always better to control more variables than less? Should we remove non-significant variables from the regression?
 ### 20.	Should we control for mediators to estimate the treatment effect?
