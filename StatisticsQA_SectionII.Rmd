@@ -1,0 +1,422 @@
+---
+title: "Weird Statistics Questions"
+author: "Hai Liang - hailiang@cuhk.edu.hk"
+date: "11/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+## II.	Inferential Statistics (Tests)
+
+### 3. Why can we use a sample to infer the population, under what conditions? What is a sampling distribution? Is it observable? Why does large sample size work?
+
+A simple random sample from a population could be used to estimate the population characteristics.
+
+```{r}
+# generate a random variable according to normal distribution with mean = 15 and sd = 3 
+# assume as the population
+rv_1 = rnorm(1000,15,3)
+c(mean(rv_1),sd(rv_1),median(rv_1)) #true mean/sd/median
+
+# generate random samples from rv_1 (the population)
+s_1 = sample(rv_1,100)
+c(mean(s_1),sd(s_1),median(s_1))
+
+s_2 = sample(rv_1,100)
+c(mean(s_2),sd(s_2), median(s_2))
+
+s_3 = sample(rv_1,100)
+c(mean(s_3),sd(s_3), median(s_3))
+```
+
+The estimates are close to the true values, thought not always the same. Let's repeat sampling many times ($N\to +\infty$) and plot the **sample means** ($\overline{X}$)--the *mean*s of all samples?
+
+```{r}
+stats = matrix(NA,nrow = 1000,ncol = 3)
+
+for (i in 1:1000){
+  s = sample(rv_1,100) # sample size = 100
+  stats[i,] = c(mean(s),sd(s),median(s))
+}
+
+par(mfrow=c(1,3))
+hist(stats[,1],main="mean",xlab="Values")
+hist(stats[,2],main="standard deviation",xlab="Values")
+hist(stats[,3],main="median",xlab="Values")
+```
+
+We call these **sampling distributions (SMD)** of *means*, *sds*, and *medians*. All these distributions should be Normal. And then, it is straightforward to calculate the *mean* and *sd* of the distributions. For the first one, the sampling distribution of *means*:
+
+```{r}
+mean(stats[,1])
+```
+It is almost the same to the population mean. How about the means of of the second and third distributions (sampling distributions of standard deviations and medians)? The pattern remains!
+
+```{r}
+c(mean(stats[,2]),mean(stats[,3]))
+```
+
+Does the pattern apply to non-normal distributions? Let's simulate a Poisson variable:
+
+```{r}
+rv_2 = rpois(1000,2.5)
+hist(rv_2)
+```
+
+Repeat the previous process:
+
+```{r}
+# samples
+stats = matrix(NA,nrow = 1000,ncol = 3)
+
+for (i in 1:1000){
+  s = sample(rv_2,100) # sample size = 100
+  stats[i,] = c(mean(s),sd(s),median(s))
+}
+
+par(mfrow=c(1,3))
+hist(stats[,1],main="mean",xlab="Values")
+hist(stats[,2],main="standard deviation",xlab="Values")
+hist(stats[,3],main="median",xlab="Values")
+c(mean(stats[,1]),mean(stats[,2]),mean(stats[,3]))
+```
+
+
+Sample size $n$ vs. sampling times $N$: $N \to +\infty$, $SMD \to {\sf Norm}(\mu,\sigma/\sqrt{n})$; $n$ approaches the population size, the _standard deviation_ of the distribution approaches to 0. Why? **Central Limit Theorem (CLT)**: $\mu_s = \mu$, $\sigma_s = \frac{\sigma}{\sqrt{n}}$, where $\mu_s$ is the mean of the sampling distribution, $\sigma_s$ is the standard deviation of the sampling distribution.
+
+```{r}
+# define a function and change n and N:
+clt_exper = function(n,N){
+  means = c()
+for (i in 1:N){
+  s = sample(rv_1,n)
+  means = c(means,mean(s))
+}
+  return(means)
+}
+
+# plot the histograms
+par(mfrow=c(2,3))
+hist(clt_exper(80,10),main = "n=80,N=10")
+hist(clt_exper(80,100),main = "n=80,N=100")
+hist(clt_exper(80,1000),main = "n=80,N=1000")
+hist(clt_exper(800,10),main = "n=800,N=10")
+hist(clt_exper(800,100),main = "n=800,N=100")
+hist(clt_exper(800,1000),main = "n=800,N=1000")
+```
+
+As you can see, large sampling times $N$ leads to more "normal" distributions, while large sample size $n$ leads to smaller variance of the distributions.
+
+```{r}
+c(mean(clt_exper(80,1000)),mean(clt_exper(800,1000)))
+c(sd(clt_exper(80,1000)),sd(clt_exper(800,1000)))
+```
+The increase of sample size didn't change the means, however, it decreased the _standard deviation_ from `r round(sd(clt_exper(80,1000)),digits=2)` to `r round(sd(clt_exper(800,1000)),digits=2)`
+
+### 4. What are the relationships between standard errors, sampling errors, confidence interval, and confidence level?
+
+The difference between the sample statistic and the population parameter is considered the **sampling error**. In a sampling distribution of means, where $\mu_s \to \mu$, when $\sigma_s \to 0$ ($n \to N$).
+
+```{r}
+sdm = clt_exper(800,1000)
+ms = mean(sdm)
+quantile(sdm,probs=c(0.025,0.975))
+```
+
+That means 95% of the sample means are within [14.95,15.14]. Given the sample distribution is a Normal distribution, 95% of the sample means should be around $\mu$: $[\mu-1.96\sigma,\mu+1.96\sigma]$ $\approx$ $[\mu_s-1.96\sigma_s,\mu_s+1.96\sigma_s]$. The standard deviation of the sampling distribution ($\sigma_s$) is called **standard error** ($SE$).
+
+```{r}
+ms-1.96*sd(sdm)
+ms+1.96*sd(sdm)
+```
+
+In practice, it is nearly impossible to observe the sampling distribution directly, therefore, we don't know the _mean_ of the sampling distribution ($\mu_s$), the _standard deviation_ of sampling distribution ($\sigma_s$), population _mean_ ($\mu$), or population _standard deviation_ ($\sigma$). What we know is the _mean_ of a sample ($\overline{x}$), and the _standard deviation_ of a sample ($s$).
+
+For example, in sample 1 (s_1), the _mean_ is `r round(mean(s_1),digits=2)`, _standard deviation_ is `r round(sd(s_1),digits=2)`. We know both are different from the population _mean_ and _standard deviation_ (`r round(mean(rv_1),digits=2)`, `r round(sd(rv_1),digits=2)`). But if we say the _mean_ of any sample `r round(mean(s_1),digits=2)` is the true _mean_, how likely we are wrong? We should based on the **CLT**, imaging the sampling distribution, and then we have ($SE=\sigma_s = \frac{\sigma}{\sqrt{n}}$):
+
+$$CI_{1-\alpha} = \overline{x} \pm Z_{\alpha/2} \cdot SE = \overline{x} \pm Z_{\alpha/2} \frac{\sigma}{\sqrt{n}}$$
+We usually call $\pm Z_{\alpha/2} \cdot SE$  **sampling error**. If $\alpha = 5\%,1-\alpha = 95\%,Z_{\alpha/2} \approx 1.96, \sigma \approx s$ (it is just convenient to use $s$ to replace $\sigma$), we will have the **95% confidence interval**:
+
+$$CI_{95\%} = \overline{x} \pm 1.96 \frac{s}{\sqrt{n}}$$
+```{r}
+m = mean(s_1)
+s = sd(s_1)
+m-1.96*s/sqrt(100)
+m+1.96*s/sqrt(100)
+```
+
+You will find that the true mean `r round(mean(rv_1),digits=2)` is within the 95% confidence interval [`r round(m-1.96*s/sqrt(100),digits=2)`,`r round(m+1.96*s/sqrt(100),digits=2)`]. Is it possible that for some ((random) samples, the true mean is not in the calculated confidence interval? The answer is yes and we even know the probability IS _5%_.
+
+
+### 5. What are the differences among T-test, Z-test, F-test, $\chi^2$-test etc.?
+A test statistic ($TS$) is a measure of the difference between the observed data and what we expected from the null hypothesis (by chance). The test statistic gets bigger (in absolute value) as the observed data looks unusual compared the null hypothesis. So a large test statistics cast doubt on the null hypothesis. There are many different kinds of tests.
+
+$$TS = \frac{Observed \space value-Expected \space value}{SE}$$
+If $TS>1.96$ => $p <.05$; $TS> 2.58$ => $p <.01$ Why? For example, in Z-test, $Z=\frac{\overline{x}-u_0}{SE} \sim {\sf Norm}(0,1)$. Therefore, $Z=\frac{\overline{x}-u_0}{SE}>1.96$. And then, $(\overline{x}-u_0)>1.96 \cdot SE$ => $\overline{x}>u_0+1.96 \cdot SE$. In a Normal distribution, only 2.5% values could be larger than $1.96 \cdot SE$. So, it is very likely that $\overline{x}>u_0$. In a Z-test, $SE=s/\sqrt{n}$.
+
+What are the differences? The distributions of the test statistics. When the sample size $n$ is relatively small, $T=\frac{\overline{x}-u_0}{SE} \sim {\sf StudentT}(\nu,0,1)$, where $\nu = n-1$ is the degree of freedom: $n \to +\infty$, then ${\sf StudenT} \to {\sf Norm}$
+
+```{r}
+# whether mu>14
+t.test(s_1,mu=14,alternative="less")
+
+# whether the two samples have equal means:
+t.test(s_1,s_2)
+
+# we don't assume equal length of the two vectors:
+t.test(s_1,rv_1)
+```
+
+Before we perform a T/Z-test, we need to check assumptions:
+
+- measurement scales: ratio or interval
+
+- simple random sample
+
+- normality (the distribution of sample means!)
+
+- large sample size 
+
+- homogeneity of variance (equal variance)
+
+Why does it require a Normal distribution? The t-test is invalid for small samples from non-normal distributions, but it is valid for large samples from non-normal distributions [(see online answers)](https://stats.stackexchange.com/questions/9573/t-test-for-non-normal-when-n50).
+
+Let's try Poisson distribution:
+
+- generate a variable with a Poisson distribution
+
+- draw a random sample (sp)
+
+- calculate the _mean_ difference between the sample and the population: `mean(sp)-mean(rv_2)`
+
+- standard error is the population _sd_ divided by the square root of sample size
+
+- get the Z score
+
+```{r}
+zs = c()
+
+for (i in 1:1000){
+  sp = sample(rv_2,100) # rv_2 here is a poisson distribution we generated before
+  m = mean(sp)-mean(rv_2)
+  se = sd(sp)/sqrt(100)
+  z = m/se
+  
+  zs= c(zs,z)
+}
+
+par(mfrow=c(1,2))
+hist(rv_2, main="Pois(2.5)")
+hist(zs,main = "Z-score")
+```
+
+The above example shows that the Z-score of a skewed variable is also normally distributed.
+
+Why does it require equal variance (only for two-sample tests)? $T=\frac{\overline{x}-u_0}{SE} \sim {\sf StudentT}(\nu,0,1)$, where $SE = s/\sqrt(n)$. We extend this to two-sample-mean comparison: $T=\frac{\overline{x}_1-\overline{x}_2}{SE} \sim {\sf StudentT}(\nu,0,1)$. It is easy to calculate the sample *mean*s ($\overline{x}_1$ and $\overline{x}_2$) and sample *standard deviation*s ($s_1$ and $s_2$). The problem is how to calculate $SE$. If the two samples are independent to each other, according to the **Variance Sum Law**:
+
+$$\sigma_{x1 \pm x2}^2 = \sigma_{x1}^2+\sigma_{x2}^2$$
+
+Therefore, $SE_{x1-x2}=\sqrt{s_1^2/n_1 + s_2^2/n_2}$. If equal variances are assumed, then $SE_{x1-x2} = \sqrt{\frac{(n_1-1)s_1^2+(n_2-1)s_2^2}{n_1+n_2-2}}$ (pooled variance estimate). The following example tests two samples from different distributions (different *mean*s and *variance*s too).
+
+```{r}
+zs_un = c() # z scores unequal variance
+zs_eq = c() # z scores equal variance
+
+for (i in 1:1000){
+  sp_1 = sample(rv_1,100) # rv_1 normal
+  sp_2 = sample(rv_2,100) # rv_2 poisson
+  
+  # mean difference
+  m = mean(sp_1)-mean(sp_2)
+  
+  # sample sds
+  se_1 = sd(sp_1)
+  se_2 = sd(sp_2)
+  
+  # unequal var.
+  se_un = sqrt(se_1^2/100+se_2^2/100)
+  # equal var.
+  se_eq = sqrt(99*(se_1+se_2)/198)
+  
+  z_un = m/se_un
+  z_eq = m/(se_eq*sqrt(2/100))
+  
+  zs_un = c(zs_un,z_un)
+  zs_eq = c(zs_eq,z_eq)
+}
+
+par(mfrow=c(1,2))
+hist(zs_un,main="Z-score (Unequal Variance)")
+hist(zs_eq,main="Z-score (Equal Variance)")
+c(mean(zs_un),mean(zs_eq))
+```
+
+Both scores followed the Normal distribution, while it appears the equal variance method tends to overestimate the significance than the unequal variance method, because `mean(zs_eq) > mean(zs_un)`.
+
+Based on "extensive" [simulations](https://stats.stackexchange.com/questions/305/when-conducting-a-t-test-why-would-one-prefer-to-assume-or-test-for-equal-vari) from distributions either meeting or not meeting the assumptions imposed by a t-test, (normality and homogeneity of variance) that the Welch-tests performs equally well when the assumptions are met (i.e., basically same probability of committing alpha and beta errors) but outperforms the t-test if the assumptions are not met, especially in terms of power. Therefore, they recommend to always use the Welch-test if the sample size exceeds 30.
+
+```{r}
+t.test(sp_1,sp_2,var.equal = T)
+t.test(sp_1,sp_2,var.equal = F)
+```
+How about the two samples are dependent? Paired T-test. If more than two samples, use F-test in ANOVA (equal or unequal variances?). If both categorical variables, then $TS \to \chi^2(k)$, where $k$ is the degree of freedom.
+
+### 6. What are distribution-free tests (non-parametric tests)? We test the difference between means, can we test the difference between medians/variances? Can we test the difference between two categorical variables?
+
+The problem that we cannot always use T-test is not because of its non-normality or unequal variances but *mean* is not well defined. Furthermore, for some test statistics (e.g., _mean difference_), we know they follow certain types of distributions. However, for others, we don't know. The distribution in distribution-free does not mean the distribution of the variables but the distribution of the test-statistics. 
+The below distribution is a mixture of two Normal distributions. The *mean* is not the most important characteristic. 
+
+```{r}
+v_1 = rnorm(500,5,1)
+v_2 = rnorm(500,10,1)
+v_3 = c(v_1,v_2)
+hist(v_3,main="Mixture of two normal distributions")
+mean(v_3)
+```
+
+```{r}
+# we define another variable in similar way:
+v_4 = c(rnorm(500,4,1),rnorm(500,11,1))
+hist(v_4)
+mean(v_4)
+```
+
+As expected, there is no difference in *mean*s.
+
+```{r}
+t.test(v_3,v_4) # no difference of mean
+```
+
+How about quantiles? Are they different?
+
+```{r}
+quantile(v_3)
+quantile(v_4)
+
+par(mfrow=c(1,2))
+boxplot(v_3,ylim=c(0,14))
+boxplot(v_4,ylim=c(0,14))
+```
+
+Yes, quantiles are informative. And the boxplots also suggest that the variances are different. However, what are the standard errors ($SEs$) of quantiles (or other quantities if defined)? Even if we know the $SE$, it remains unknown about the distribution of the test statistics. An easy way is to to perform the randomization test, which is one of the most commonly used non-parametric tests. 
+
+The below code shows an example of testing variance difference using randomization test (use `var.test` for a parametric test):
+
+1. given any two variables: x1, x2
+
+2. calculate the difference of standard deviation: `sd(x1)-sd(x2)`
+
+3. Permutation 
+
+    - combine two variables to a single one: values = c(x1,x2)
+  
+    - randomly permute the values
+  
+    - split the permuted values into two groups and calculate the difference again
+  
+    - repeat many time
+  
+4. compare the real difference with the differences after permutation
+
+```{r message=FALSE,warning=FALSE}
+sts = sd(v_3)-sd(v_4)
+sds_all = c()
+
+for (i in 1:1000){ #repeat many times
+  values = c(v_3,v_4) # combine all values
+  pv = sample(values) # randomly permute the values
+  sds = sd(pv[1:500])-sd(pv[501:1000]) # split into two groups and calculate the difference of sds
+  sds_all = c(sds_all,sds) 
+}
+
+hist(sds_all,xlim=c(-1,1))
+abline(v=sts,col="red")
+
+table(sts<sds_all)/1000 # probability of true!
+```
+
+It means that the observed difference is smaller than 100% of the permuted differences. In other words, it is very unlikely the observed variance difference is caused by chance.
+
+Another method is to use bootstrapping:
+
+1. given two variables: x1, x2
+
+2. calculate the difference: `sd(x1)-sd(x2)`
+
+3. bootstrap:
+
+    - resample from x1 and x2
+    
+    - calculate the difference in the subsamples
+    
+    - repeat many times
+    
+4. compare the real difference with the differences after permutation
+
+We don't need to do step 3 from the scratch because we can use the `boot` package in r.
+
+```{r message=FALSE,warning=FALSE}
+library(boot)
+data = data.frame(v_3,v_4)
+sts = function(d,i){
+  d2=d[i,]
+  dis = sd(d2$v_3)-sd(d2$v_4)
+  return(dis)
+}
+boot_sd = boot(data,sts,R=1000) # define the data, define the test statistic, repetition times
+boot_sd
+boot.ci(boot.out = boot_sd, type = c("norm", "basic", "perc", "bca"))
+plot(boot_sd)
+```
+
+**Randomization tests** take the set of scores, randomize their ordering, and compute statistics from the results. **Permutation tests** do the same thing, but I reserve that label for tests in which we take all possible permutations of the data, rather than a subset or rearrangements. **Bootstrapping** resamples with replacement from a set of data and computes a statistic (such as the mean or median) on each resampled set. Bootstrapping is used primarily for parameter estimation. Bootstrapping is primarily focused on estimating population parameters, and it attempts to draw inferences about the population(s) from which the data came. Randomization approaches, on the other hand, are not particularly concerned about populations and/or their parameters. Instead, randomization procedures focus on the underlying mechanism that led to the data being distributed between groups in the way that they are [(click here for a more detailed introduction)](https://www.uvm.edu/~statdhtx/StatPages/ResamplingWithR/ResamplingR.html).
+
+Randomization Tests (Contingency Tables): (Fisher's Exact Test). [Fisher's exact test](https://en.wikipedia.org/wiki/Fisher%27s_exact_test) is a statistical test used to determine if there are nonrandom associations between two categorical variables.
+
+```{r}
+tbl = matrix(data=c(65, 45, 20, 40), nrow=2, ncol=2, byrow=T)
+dimnames(tbl) = list(City=c('B', 'T'), Gender=c('M', 'F'))
+tbl
+chisq.test(tbl)
+fisher.test(tbl)
+```
+Odds ration: $OR = \frac{65/20}{45/40} = \frac{65\times40}{45\times20}$. The odds ratio shows how many times more positive cases (Male in city B + Female NOT in B) occur than negative cases (Male NOT in B + Female in B).
+
+_Bootstrapping for correlation coefficients_. Recall that we don't assume normality of variables to calculate correlation coefficients (particularly Pearson's $r$). However, it might influence the significance test (or estimation of confidence interval).
+
+```{r}
+# generate two highly skewed variables
+r1 = rweibull(1000,0.5)
+r2 = 0.5*r1 + rweibull(1000,0.5)
+data = data.frame(r1,r2)
+
+# calculate the correlation coefficients
+cor.test(r1,r2)
+cor.test(rank(r1),rank(r2))
+```
+Please note that the confidence interval of the rank correlation is more narrow than that of Pearson's correlation. Alternatively, we test the significance of the coefficients using bootstrapping (without assuming that how the sampling $r$s distributed).
+
+```{r}
+# define the statistics:
+rs_1 = function(d,i){
+  d2=d[i,]
+  r = cor(d2$r1,d2$r2,method="pearson")
+  return(r)
+}
+
+rs_2 = function(d,i){
+  d2=d[i,]
+  r = cor(d2$r1,d2$r2,method="spearman")
+  return(r)
+}
+
+# run bootstrapping
+boot_r1 = boot(data,rs_1,R=1000) # define the data, define the test statistic, repetition times
+boot_r2 = boot(data,rs_2,R=1000) # define the data, define the test statistic, repetition times
+
+# obtain confidence interval
+boot.ci(boot.out = boot_r1, type = c("norm", "basic", "perc", "bca"))
+boot.ci(boot.out = boot_r2, type = c("norm", "basic", "perc", "bca"))
+```
+

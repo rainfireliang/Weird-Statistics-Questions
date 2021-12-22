@@ -1,0 +1,391 @@
+---
+title: "Weird Statistics Questions"
+author: "Hai Liang - hailiang@cuhk.edu.hk"
+date: "11/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+## III.	Regression (OLS)
+
+### 7. Can regression models (why plural?) replace all the above-mentioned tests in section II?
+
+The commonly used Ordinary Least Square (OLS) regression is just one of the many regression models, as we will explain the details in section IV. But as we have already known that Logistic Regression is different from OLS regression. 
+
+In section II, we introduced several statistics, basically comparing the difference of *mean*s: Z and T for two groups and F for more than two groups. In a regression framework, the dependent variable is a continuous variable, while the independent variable is a categorical variable.
+
+Compare `t.test` with `lm`:
+```{r}
+head(sleep) # load the sleep data
+t.test(extra~group,data=sleep,var.equal = T) # assume equal variance
+summary(lm(extra~group,data=sleep))
+```
+
+Note that both $t$ and $p$ values are similar. In addition, the mean difference 2.33-0.75 = 1.58, which is the regression coefficient. 
+
+How about the situation with more than 2 groups (using F-test in `avo`)?
+
+```{r}
+head(npk)
+aggregate(yield~block,npk,mean)
+summary(aov(yield~block,data=npk))
+summary(lm(yield~block,data=npk))
+```
+
+This is straightforward because `lm` actually reported F-test statistics as well. They are exactly the same thing!
+
+How about non-normal distribution?
+
+```{r}
+# generate data
+g1 = rpois(500,2.5)
+g2 = rpois(500,3.5)
+dv = c(g1,g2)
+groups = c(rep(1,500),rep(0,500))
+d = data.frame(dv,groups)
+
+# compare the two outputs
+t.test(dv~groups,d)
+summary(lm(dv~groups,d))
+```
+
+Testing for categorical variables (contingency tables) requires a regression model that we are less familiar with. We create a contingency table with two variables: city and gender. To test the dependence between the two, we use either $\chi^2$-test (parametric) or Fisher's exact test (non-parametric).
+
+```{r}
+tbl = matrix(data=c(65, 45, 20, 40), nrow=2, ncol=2, byrow=T)
+dimnames(tbl) = list(City=c('B', 'T'), Gender=c('M', 'F'))
+tbl
+chisq.test(tbl)
+fisher.test(tbl)
+```
+Since this is just a 2 by 2 table, theoretically speaking, we can use logistic regression if we know the pre-aggregated data. We consider the frequencies in the contingency table the dependent variable and the city and gender as independent variables. Given the dependent variable is a count variable, as we will explain in section IV, we use a poisson regression to fit the data. 
+
+```{r}
+## log linear model
+ctbl = data.frame(freq = c(65, 45, 20, 40), city = c("B","B","T","T"), gender = c("M","F","M","F"))
+summary(logLM <- glm(freq ~city*gender, family=poisson(link="log"), data=ctbl))
+```
+The interaction coefficient (cityT:genderM = -1.0609) indicate the dependence between gender and city. In fact, log-linear is an extension of the $\chi^2$-test.
+
+
+### 8. What is the degree of freedom? Is it possible to fit a regression model with $R^2$=1? What is over-fitting? Why should we avoid over-fitting?
+
+Degrees of freedom ($df$) are the number of independent values that a statistical analysis can estimate. You can also think of it as the number of values that are free to vary as you estimate parameters. Typically, the degrees of freedom equals your sample size minus the number of parameters you need to calculate during an analysis ($N-P$). Degrees of freedom is a combination of how much data you have and how many parameters you need to estimate. It indicates how much independent information goes into a parameter estimate. In this vein, it’s easy to see that you want a lot of information to go into parameter estimates to obtain more precise estimates and more powerful hypothesis tests. So, you want many $df$! 
+
+```{r}
+# generate a data sets with 3 IVs and y
+x1 = rnorm(100,5,1)
+x2 = rnorm(100,1,1)
+x3 = rnorm(100,2,2)
+y = 2*x1+1.5*x2+1.1*x3+rnorm(100) # sample size = 100
+data = data.frame(y,x1,x2,x3)
+
+# fit a linear model with 2 variables and find the df.
+summary(lm(y~x1+x2,data = data)) # df = 100-3 (why 3 not 2?)
+```
+
+Please note that the degree of freedom is 97, instead of 100-2 = 98. For a typical OLS regression, an intercept is estimated by default. How about if we only have 3 observations? Theoretically speaking, $df$ = 3-3 = 0. As presented below, NAs were produced in `lm`. Actually, a model with $df=0$ is a just identified model with unique solution and the $R^2$ should be 1.
+
+```{r}
+summary(lm(y~x1+x2,data = data[sample(100,3),])) # 3 observations
+summary(lm(y~x1+x2,data = data[sample(100,4),])) # 4 observations
+```
+
+As $df \to 0$, the $R^2 \to 1$, even though it is not significant. The `lm` function only works for $df>0$. Nevertheless, we can solve the linear system mathematically when $df=0$ (we cannot do that when $df<0$).
+
+```{r message=FALSE,warning=FALSE}
+library(matlib)
+
+slice = data[sample(100,3),] # select the first 3 observations
+A = as.matrix(slice[,2:3]) # IVs as matrix
+b = slice$y # dependent variable 
+Solve(A, b) # solve the function 
+```
+In statistics, over-fitting is "the production of an analysis that corresponds too closely or exactly to a particular set of data, and may therefore fail to fit additional data or predict future observations reliably". An over-fitted model is a statistical model that contains more parameters than can be justified by the data (i.e., small $df$). The essence of over-fitting is to have unknowingly extracted some of the residual variation (i.e., the noise) as if that variation represented underlying model structure. 
+
+How is this possible? In our case, we know how the data was generated according to $y = 2x_1+1.5x_2+1.1x_3+\varepsilon$. If we measured all $x_i$, we will find a perfect solution. Let's include all three predictors:
+
+```{r}
+summary(lm(y~x1+x2+x3,data))
+```
+
+The $R^2=$ is not 1, given the existence of $\varepsilon \sim {\sf Norm}(0,1)$. Otherwise, it is a deterministic models (in contrast to probabilistic). Let's generate y2 without the random error ($\varepsilon$).
+
+```{r}
+y2 = 2*x1+1.5*x2+1.1*x3
+summary(lm(y2~x1+x2+x3))
+```
+
+Now, the $R^2$ is 1. Is this just-identified model ($df=0$), a perfect model (deterministic), or over-fitted model? Let's show another $R^2=1$ example that it is an over-fitted model.
+
+```{r}
+# create a categorical variable with 50 levels in the 'data'
+data$v1 = as.factor(c(1:50,1:50))
+summary(aov(x3~v1,data))
+```
+The new variable is not associated with any $x_i$. Regress v1 on y:
+
+```{r}
+# fit the first 50 observations
+model1<-lm(y~v1,data[1:50,]) 
+summary(model1)$r.squared           
+```
+
+We can achieve $R^2=1$ without any information from $x_i$! Is this a good model? Let's use "model1" to predict the rest of 50 ys in the data set (and calculate $R^2=1-\frac{\sum_i(y_i-\hat{y_i})^2}{\sum_i(y_i-\overline{y})^2}$).
+
+```{r}
+# predict using other 50 observations (xs)
+y_predict = predict(model1,data[51:100,])
+
+# compare predicted and true values
+y_real = y[51:100]
+
+1-sum((y_real-y_predict)^2)/sum((y_real-mean(y_real))^2)
+plot(y_real,y_predict)
+```
+
+Even though model1 is a perfect model for the first 50 observations, the model is not applicable to the second 50 observations. In this case, we say model1 is an over-fitted model. 
+
+### 9. How to interpret regression coefficients (direction, magnitude/strength, significance, form)? How to interpret when predictors are categorical? How to compare regression coefficients?
+
+```{r}
+# to generate a data set with both continuous and categorical variables
+x1 = rnorm(1000,10,2)
+x2 = rnorm(1000,7,3)+0.5*x1
+x3 = rbinom(1000,1,0.3)
+x4 = sample(1:3, size = 1000, replace = TRUE, prob = c(0.2,0.5,0.3))
+
+#dummy coding for x4
+x41 = ifelse(x4==1,1,0)
+x42 = ifelse(x4==2,1,0)
+x43 = ifelse(x4==3,1,0)
+
+# dependence between x and y
+y = -2.2*x1+2.2*x2+3.3*x3+4*x42+8*x43+rnorm(1000)
+
+# create the data frame
+data = data.frame(y,x1,x2,x3,x4,x41,x42,x43)
+```
+
+Let's fit an OLS regression using `lm` and try to interpret the coefficients according to the direction (positive or negative), magnitude (weak or strong), form (linear or nonlinear), and significance (significant or not).
+
+```{r}
+summary(m <- lm(y~x1+x2+x3+factor(x4)))
+```
+The coefficient for $x_3$ indicates the difference of $y$ between $x_3=1$ and $x_3=0$. Then, what does the coefficient for $x4=3$ mean? Does it indicate the difference between $x4=3$ and $x4=1 \space or \space 2$?
+
+```{r}
+#calculate the means for each category
+aggregate(y~x4,data,mean)
+```
+
+Using standardized coefficients $\beta s$ for comparisons. It is easy to calculate $\beta s$ using the `lm.beta` function.
+
+```{r message=FALSE,warning=FALSE}
+library(lm.beta)
+betas = lm.beta(m)
+betas
+```
+We see that the absolute value of raw coefficient of x1 is close to that of x2, however, it is smaller in terms of the standardized coefficients. So, can we say $|\beta_{x_2}|-|\beta_{x_1}|$ and $x_2$ shows a greater impact on $y$? We still need a significance test, which requires the $SE$. The full version of the **Variance Sum Law**:
+
+$$Var(c_1b_1+c_2b_2)=c_1^2Var(b_1)+c_2^2Var(b_2)+2c_1c_2Cov(b_1,b_2)$$
+
+We can obtain the variance-covariance matrix using the `vcov` function in R:
+
+```{r}
+vc = vcov(m) # variance-covariance matrix
+vc
+```
+
+In this case, $SE_{b_{x_2}-b_{x_1}} = \sqrt{Var_{x_1}+Var_{x_2}+2Cov(x_1,x_2)}$. Therefore, the standard error of the difference could be calculated as below:
+
+```{r}
+# the difference between the two unstandardized coefficients
+diff = abs(m$coefficients['x2'])-abs(m$coefficients['x1']) 
+var_x1 = vc[2,2] # variance
+var_x2 = vc[3,3] # variance
+cov_x1x2 = vc[3,2] # covariance
+se_diff = sqrt(var_x1+var_x2+2*cov_x1x2) # standard error of the difference
+z = diff/se_diff # z score
+names(z) = NULL
+z
+```
+
+It is less than 1.96, so it is not significant. We can use the following code to obtain the $p$ value:
+
+```{r}
+pvalue = pnorm(-abs(z))
+pvalue
+```
+
+We can do something even more interesting, such as to test whether $b_{x_1}>2.2$.
+
+```{r}
+diff=abs(m$coefficients['x1'])-2.2
+var_x1 = vc[2,2]
+var_2.2 = 0
+cov_x12.2 = 0
+se_diff = sqrt(var_x1+var_2.2+2*cov_x12.2)
+z = diff/se_diff
+names(z) = NULL
+pvalue = pnorm(-abs(z))
+c(z,pvalue)
+```
+Whether $b_{x_4=3}>2b_{x_4=2}$?
+
+```{r}
+diff=abs(m$coefficients['factor(x4)3']-2*m$coefficients['factor(x4)2'])
+var_x43 = vc[6,6]
+var_x42 = vc[5,5]
+cov_x4 = vc[5,6]
+se_diff = sqrt(var_x43+4*var_x42+4*cov_x4)
+z = diff/se_diff
+names(z) = NULL
+pvalue = pnorm(-abs(z))
+c(z,pvalue)
+```
+
+Will standardization of variables change the variance-covariance matrix?
+
+```{r}
+summary(m1<-lm(y~x1+x2,data = data))
+
+# standardized all variables
+y_s = (data$y-mean(data$y))/sd(data$y) 
+x1_s = (data$x1-mean(data$x1))/sd(data$x1)
+x2_s = (data$x2-mean(data$x2))/sd(data$x2)
+summary(m2<-lm( y_s ~ x1_s+x2_s-1)) # without intercept
+lm.beta(m2)
+```
+
+The coefficients in the regression model based on the standardized variables (m2) are equal to the standardized coefficients. Check the variance-covariance matrices:
+
+```{r}
+vcov(m1)
+vcov(m2)
+```
+
+They are different. Any implications?
+
+### 10. Why the I.I.D. assumption is essential? 
+
+A regression model could be write as a combination of two parts: random part + systematic part. 
+
+$$Y_i \sim {\sf Norm}(\mu_i,\sigma)$$
+$$\mu_i = X_i\beta_1 + \beta_0$$
+
+I.I.D refers to independent and identical distribution.
+
+- Each draw from the bag must be independent. This means that the value you get on one draw does not depend in any way on other draws. Not repeated measures. 
+
+- Each observation is drawing from the same bag. In other words, you are drawing values from the same distribution. The shape of this distribution does not matter, even though some people will claim that it must be normally distributed. However, regardless of the shape, all observations must be drawing from an identically shaped distribution.
+
+### 11.	What if residuals are normally distributed, but the dependent variable is not? Is this possible?
+
+Let's create a variable y that is determined by two skewed variables and a normally distributed random error.
+
+```{r}
+x1 = rexp(1000,1.5)
+x2 = rweibull(1000,0.5)
+y = 7*x1+2*x2+rnorm(1000)
+hist(y)
+summary(lm(y~x1+x2))
+```
+
+As you can see, the dependent variable is skewed while the OLS regression estimated the coefficients correctly. The assumption is not about the shape of the dependent variable but how the random error of generating the dependent variable (the random part in the generation process).
+
+### 12.	Why effect size is important? Is it true that larger coefficients indicate larger effect sizes? How to measure the unique effect of an independent variable on the dependent variable without any confounding effects of other independent variables (or can stepwise regression models solve the problem)? 
+
+```{r}
+summary(m)
+betas
+```
+
+There are many effect size [measures](https://www.spss-tutorials.com/effect-size/). $\beta$ could be used as effect size, but it is really hard to interpret. In regression models, $R^2$ is most intuitive (variance explained), but it is a overall measure.
+
+**Squared Semi-partial correlation** ($sr^2$) tells us how much of the unique contribution of an independent variable to the total variation in dependent variable. In other words, it explains increment in R-square ($\Delta R^2$) when an independent variable is added.
+
+```{r}
+a = summary(lm(y~x3+factor(x4),data))$r.squared #0.18
+b = summary(lm(y~x1+x3+factor(x4),data))$r.squared #0.27
+deta = b-a
+deta
+```
+
+Therefore, $x_1$ increased $R^2$ by `r deta`?
+
+```{r}
+c = summary(lm(y~x1+x2+x3+factor(x4),data))$r.squared #0.98
+deta2 = c-b
+deta2
+```
+
+Therefore, $x_2$ increased $R^2$ by `r deta2`? Why is this method problematic? Let's change the input order...
+
+```{r}
+cor.test(data$x1,data$x2)
+b_ = summary(lm(y~x2+x3+factor(x4),data))$r.squared
+b_-a # variance x2 explained
+c - b_ # variance x1 explained
+```
+It's a different story, which suggests that $x_1$ increased $R^2$ by `r c-b_`, while $x_2$ $R^2$ by `r b_-a`. The correct way to calculate the **Squared Semi-partial correlation** ($sr^2$) is to use the "one-less" approach:
+
+- fit the full model with all predictors and calculate the overall $R^2_full$
+
+- remove one predictor ($x_i$) from the full model and then fit the "one-less" model
+
+- calculate the $R^2_{(i)}$ for the "one-less" model and $\Delta R^2_i = R^2_full - R^2_{(i)}$
+
+```{r}
+# total
+ovall = summary(lm(y~x1+x2+x3+factor(x4),data))$r.squared 
+
+# one less by removing x1 from m
+ovall - summary(lm(y~x2+x3+factor(x4),data))$r.squared
+
+# one less by removing x2 from m
+ovall - summary(lm(y~x1+x3+factor(x4),data))$r.squared
+
+# one less by removing x3 from m
+ovall - summary(lm(y~x1+x2+factor(x4),data))$r.squared
+
+# one less by removing x4 from m
+ovall - summary(lm(y~x1+x2+x3,data))$r.squared
+```
+
+In fact, $x_1$ can explain `r ovall - summary(lm(y~x2+x3+factor(x4),data))$r.squared` variance. Why is the sum of all $R^2s$ larger than 100%?
+
+### 13.	Is it possible to estimate the main effects from a regression model with interaction terms? 
+
+Let's fit a model with interaction:
+```{r}
+summary(full <- lm(y~x1*x3+x2,data))
+```
+
+Can we say the main effect of x1 is `r round(full$coefficients["x1"],digits=2)`?
+
+When $x_3=0$:
+
+```{r}
+summary(lm(y~x1*x3+x2,data[data$x3==0,]))
+```
+
+When $x_3=1$,
+
+```{r}
+summary(lm(y~x1*x3+x2,data[data$x3==1,]))
+```
+
+It demonstrates that it is not the main effect but the effect when $x_3=0$. The main effects could be obtained in the following ways (the real value is in between):
+
+```{r message=FALSE,warning=FALSE}
+# margins based on the full model
+library(margins)
+margins(full)
+
+# fit a model without interaction term
+summary(lm(y~x1+x2+x3,data))
+```
+
+The marginal effect represents the difference of (two) predictions for an (infinitesimal) change in x (the focal term). The average marginal effect represents the average slope of that predictor. In other words: the average marginal effects is one value per parameter (term), thus it can be considered as an **adjusted regression coefficient**, while predicted values usually predict the average outcome for different values of x - you usually don’t have just one coefficient in the latter case that represents the overall effect of x.

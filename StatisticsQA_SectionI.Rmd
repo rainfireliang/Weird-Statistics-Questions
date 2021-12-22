@@ -1,0 +1,233 @@
+---
+title: "Weird Statistics Questions"
+author: "Hai Liang - hailiang@cuhk.edu.hk"
+date: "11/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+## I.	Descriptive Statistics
+
+### 1. How to represent and summarize a variable? Why do we calculate mean and standard deviation for a variable? How about if the variable is skewed or discrete?
+
+The most accurate way to represent a variable is to visualize it as a distribution histogram (distribution is close to the raw data). We usually use *mean* ($\mu$) to quantify the central tendency (typical value) of the distribution and *standard deviation* ($\sigma$) to characterize the degree of dispersion/spread. In addition, we use quantiles to measure locations of a distribution. 
+
+Notes:
+
+- *mean* is just one of the measures of central tendency. Another two common measures are *mode* and *median*. Which measure is the most appropriate to use depends on the questions and also the shape of the distribution.
+
+- *standard deviation* is defined according to the *mean*. If *mean* is not clearly defined, there is no *standard deviation* either. Given the association between *mean* and *standard deviation*, it is also meaningless to compare *standard deviations* across data sets. To compare dispersion across groups, we can use the *coefficient of variation*: $CV = \sigma/\mu$.
+
+- if the distribution curve can be described mathematically using a distribution formula, the parameters of the formula will be the accurate measures.
+
+For example, a Normal distribution (bell curve) could be described as $X \sim {\sf Norm}(\mu,\sigma)$, while a Poisson distribution (right skewed curve) could be described as $X \sim {\sf Pois(\lambda)}$. In a Normal distribution, *mean* and *standard deviation* are the two parameters that determine the distribution. Given the popularity of Normal distribution in the real world, the two parameters are commonly used measures to characterize data sets (represented as distribution histogram). In a Poisson distribution, $\lambda$ is the only parameter (rate parameter), which is the total number of events ($k$) divided by the number of units ($n$) in the data ($\lambda = k/n$).
+
+In R, we use `rnorm` and `rpois` functions to generate Normal and Poisson distributions respectively, by setting the respective parameters.
+
+```{r}
+x_norm = rnorm(1000, 10, 2) # mean = 10, sd = 2
+x_pois = rpois(1000,2.5) # lambda = 2.5
+par(mfrow=c(1,2))
+hist(x_norm,main="Norm(10,2)")
+hist(x_pois,main="Pois(2.5)")
+```
+
+As expected, the *mean*s of the generated data are close to the theoretical ones:
+
+```{r}
+c(mean(x_norm),mean(x_pois)) 
+```
+It is interesting to calculate the *standard deviation*s:
+
+```{r}
+c(sd(x_norm),sd(x_pois))
+```
+The *standard deviation* of the Poisson distribution is `r round(sd(x_pois),digits=2)`. The variance is the *standard deviation*^2^ = `r round(sd(x_pois)^2, digits=2)`, which is close to the *mean* $\lambda$. In fact, $E[X] = Var[X]$ for Poisson distribution. We will explain the formula soon below.
+
+Question:
+
+- As suggested in some text books, we should use _median_ or _mode_ to characterize the central tendency of skewed distributions. The median for x_pois is `r median(x_pois)`. Is this value informative, better than the *mean*?
+
+
+*mean* and thus *standard deviation* are not well defined for categorical variables. The distribution could be described as $f(x=k)=p_{k}$. We use the `sample` function to generate two categorical variables by defining $p_k$s.
+
+```{r}
+x_cat1 = sample(8:12, size = 1000, replace = TRUE, prob = c(0.25,0.1,0.3,0.25,0.1))
+x_cat2 = sample(8:12, size = 1000, replace = TRUE, prob = c(0.1,0.25,0.3,0.1,0.25))
+c(mean(x_cat1),mean(x_cat2)) #means
+c(sd(x_cat1),sd(x_cat2)) #standard deviations
+```
+
+Even though the *mean*s are hard to interpret (what does it mean if I say the average of race in Hong Kong is 3.1?), the above calculation indicates that the two variables have similar *mean*s and *standard deviation*s. They are actually two different distributions, as presented below:
+
+```{r}
+tbl_cat1 = table(x_cat1)
+tbl_cat2 = table(x_cat2)
+par(mfrow=c(1,2))
+barplot(tbl_cat1)
+barplot(tbl_cat2)
+```
+
+The best way is to calculate the frequency tables:
+
+```{r}
+tbl_cat1 = data.frame(tbl_cat1)
+tbl_cat1$Prob_x1 = tbl_cat1$Freq/sum(tbl_cat1$Freq)
+tbl_cat1$Category = paste0(tbl_cat1$x_cat1)
+t1 = tbl_cat1[,c("Category","Prob_x1")]
+
+tbl_cat2 = data.frame(tbl_cat2)
+tbl_cat2$Prob = tbl_cat2$Freq/sum(tbl_cat2$Freq)
+t1$Prob_x2 = tbl_cat2$Prob
+
+t1
+```
+
+Question:
+
+Are there any continuous distributions without _mean_ or _variance_? See [Pareto distribution](https://exploringpossibilityspace.blogspot.com/2013/08/tutorial-how-fat-tailed-probability.html).
+
+If there are many distributions without "meaningful" _mean_ or _variance_, why are they so popular measures in statistics? Let's introduce another concept -- Expected Value.
+
+- For discrete distributions: $E[X] = \sum_{k=1}^n x_{k}P(X=x_{k})$. 
+
+- For continuous distributions: $E[X]=\int_{-\infty}^{\infty}xf(x)dx$.
+
+```{r}
+x = c(8:12)
+px_cat1 = tbl_cat1$Prob_x1 # estimated probs
+px_cat2 = c(0.1,0.25,0.3,0.1,0.25) # true probs
+
+EX_cat1 = sum(x*px_cat1) # expectation
+EX_cat2 = sum(x*px_cat2) # expectation
+
+EX_cat1 - mean(x_cat1) # the same
+EX_cat2 - mean(x_cat2) # slightly different
+```
+
+Are there any cases that $E[X] \neq mean(X)$? 
+Biased samples! The expectation, by definition, is true (of he population), while _mean_ might not be true in biased samples. 
+
+For Normal distribution, $E[X] = \mu \approx mean$. For Poisson distribution, $E[X]=\lambda \approx mean$. If expectation is the only parameter for the distribution (e.g., $\lambda$ in Poisson), the _mean_ suffices to characterize the distribution. That means if we know the parameter $\lambda$, we can recover the distribution using the formula: $\sf Pois(\lambda) = \frac{\lambda^ke^{-\lambda}}{k!}$. However, _mean_ ($\mu$) is not sufficient to characterize a Normal distribution because it varies with _standard deviation_ ($\sigma$) too. For categorical distribution, we need $k-1$ probabilities ($p_{k}$) to characterize the distribution. Specifically, a binary variable with 0 and 1, we only need 1 probability (the proportion of 1) to describe the distribution ($E[X] = p$, $Var[X]=E[(X-E[X])^2]=p(1-p)$). 
+
+Therefore, to describe a (sampled) data precisely, we need to know the underlying distribution (that generated the observed data) first. And then, we could estimate the corresponding parameters based on the sample. But what should we do if we don't know the underlying distribution?
+
+If the function is a probability distribution, then the first moment is the expected value (*mean*), the second central moment is the variance (*sd^2^*: $Var[X] = E[(X-E[X])^2]$), the third standardized moment is the skewness (*skewness*), and the fourth standardized moment is the kurtosis (*kurtosis*)...Even if the $E(X)$ is not directly interpretable, it remains important when we consider the relationships between a sample and the population (see Q3). 
+
+Nevertheless, *mean* and *sd* could be interpreted in skewed distributions. Chebyshev’s inequality says that at least $1-1/K^2$ of data from a sample must fall within $K$ standard deviations from the _mean_, where $K$ is any positive real number greater than one.
+
+- For $K = 2$ we have $1-1/K^2$ = 1 - 1/4 = 3/4 = 75%. So Chebyshev’s inequality says that at least 75% of the data values of any distribution must be within two *standard deviation*s of the *mean*.
+
+- For $K = 3$ we have $1-1/K^2$ = 1 - 1/9 = 8/9 = 89%. So Chebyshev’s inequality says that at least 89% of the data values of any distribution must be within three *standard deviations* of the *mean*.
+
+- For $K = 4$ we have $1-1/K^2$ = 1 - 1/16 = 15/16 = 93.75%. So Chebyshev’s inequality says that at least 93.75% of the data values of any distribution must be within four *standard deviation*s of the *mean*.
+
+
+
+### 2. We use correlation coefficients (why plural?) to quantify the (linear) relationships between two continuous variables, how can we show the relationships involving categorical/rank variables?
+
+```{r}
+rv_1 = rnorm(1000,10,2)
+rv_2 = 0.5*rv_1 + rnorm(1000)
+
+cor.test(rv_1,rv_2)
+plot(rv_1,rv_2)
+```
+
+The Pearson coefficient $r$ = `r round(cor(rv_1,rv_2),digits=2)` is larger than 0.5. Why? $r^2=$ `r round(cor(rv_1,rv_2)*cor(rv_1,rv_2),digits=2)` $\approx 0.5$. Now, we generate a non-normal variable rv_3.
+
+```{r}
+rv_3 = rpois(1000,2.5)
+rv_4 = 0.5*rv_3 + rnorm(1000)
+
+par(mfrow=c(1,3))
+hist(rv_3)
+hist(rv_4)
+plot(rv_3,rv_4)
+```
+
+We have different ways to calculate the correlation between two continuous variables (rank, interval, or ratio): Pearson's $r$, Spearman's $\rho$, and Kendall's $\tau$.[Please check the method definitions here](http://www.sthda.com/english/wiki/correlation-test-between-two-variables-in-r).
+
+```{r}
+cor.test(rv_3,rv_4,method = "pearson")
+cor.test(rv_3,rv_4,method = "spearman")
+cor.test(rv_3,rv_4,method = "kendall")
+```
+
+we can see that Pearson and Spearman correlations are roughly the same, but Kendall is very much different. That’s because Kendall is a test of strength of **dependence** (i.e. one could be written as a linear function of the other), whereas Pearson and Spearman are nearly equivalent in the way they correlate normally distributed data. All of these correlations are correct in their result, it’s just that Pearson and Spearman are looking at the data in one way, and Kendall in another.
+
+In fact, the Pearson' $r$ of the ranks of the original variables is equivalent to Spearman's $\rho$:
+
+```{r}
+cor(rv_1,rv_2,method = "pearson") # pearson
+cor(rank(rv_1),rank(rv_2),method = "pearson") # ranks -> pearson
+cor(rv_1,rv_2,method = "spearman") #spearman
+```
+Pearson's correlation ($r$) is a measure of the **linear** relationship between two continuous random variables. It does not assume normality although it does assume finite variances and finite covariance ($Cov(X,Y) = E[(X-E(X))(Y-E(Y))]=E[XY]-E[X]E[Y]$). When the variables are Bivariate Normal (the sampling distribution of $r \sqrt{\frac{n-2}{1-r^2}}$ will follow a Student's t-distribution), Pearson's correlation provides a complete description of the association. In order words, violation of Bivariate Normal may influence the significance tests (when sample size is small). 
+
+Spearman's correlation ($\rho$) applies to ranks and so provides a measure of a **monotonic** (could be non-linear) relationship between two continuous random variables. It is also useful with ordinal data and is robust to outliers (unlike Pearson's correlation). When correlating skewed variables, particularly highly skewed variables, a log or some other transformation often makes the underlying relationship between the two variables clearer. In such settings it may be that the raw metric is not the most meaningful metric anyway. Spearman's $\rho$ has a similar effect to transformation by converting both variables to ranks. From this perspective, Spearman's $\rho$ can be seen as a quick-and-dirty approach (or more positively, it is less subjective) whereby you don't have to think about optimal transformations.
+
+The two coefficients will be very different, if the relationship between the variable is non-linear. The following R code shows how the correlations between $x$ and $x^n$ differ over $n$.
+
+```{r}
+rs = sapply(1:10,function(i)cor(rv_1,rv_1^i,method = "pearson"))
+rhos = sapply(1:10,function(i)cor(rv_1,rv_1^i,method = "spearman"))
+plot(rs,ylab = "Pearson's r",xlab="x^n")
+lines(rhos)
+```
+
+Spearman's $\rho$ vs. Kendall's $\tau$ (tau). These two are so much computationally different that you cannot directly compare their magnitudes. Spearman is usually higher by 1/4 to 1/3 and this makes one incorrectly conclude that Spearman is "better" for a particular dataset. The difference between $\rho$ and $\tau$ is in their ideology, proportion-of-variance for $\rho$ and probability for $\tau$. $\rho$ is a usual Pearson's $r$ applied for ranked data. $\tau$ is more "general" than $\rho$, for $\rho$ is warranted only when you believe the underlying (model, or functional in population) relationship between the variables is strictly **monotonic**. While $\tau$ allows for **non-monotonic** underlying curve and measures which monotonic "trend", positive or negative, prevails there overall. $\rho$ is comparable with $r$ in magnitude; $\tau$ is not.
+
+```{r}
+rv_x = -0.5*rv_1^2+11*rv_1+rnorm(1000) # it is non-linear non-monotonic
+plot(rv_1,rv_x)
+
+cor.test(rv_1,rv_x, method = "pearson")
+cor.test(rv_1,rv_x, method = "spearman")
+cor.test(rv_1,rv_x, method = "kendall")
+```
+
+Cosine similarity (a kind of dependence!) between two vectors A and B is defined as $$CosSim = \frac{\sum(A_iB_i)}{(\sqrt{\sum{A_i^2}}\sqrt{\sum{B_i^2}})}$$
+
+Given any two vectors, the similarity score could be calculated in the following way:
+
+```{r}
+a = sum(rv_1*rv_x)
+b = sqrt(sum(rv_1*rv_1))*sqrt(sum(rv_x*rv_x))
+a/b
+```
+
+Finally, how to quantify the "correlation" (dependence is a more appropriate term here) between two categorical variables:
+
+```{r}
+tbl = matrix(data=c(65, 45, 20, 40), nrow=2, ncol=2, byrow=T)
+dimnames(tbl) = list(City=c('B', 'T'), Gender=c('M', 'F'))
+
+tbl
+chi2 = chisq.test(tbl, correct=T)
+c(chi2$statistic, chi2$p.value)
+```
+
+$\chi^2$ is NOT normalized. In a $k \times l$ contingency table, the theoretical maximal value of $\chi^2$ is $N(min(k,l)-1)$, So, we define **Cramer’s $V$**: $V = \sqrt{\frac{\chi^2}{N(min(k,l)-1)}}$. $V$ ranges from 0 to 1. Therefore,
+
+```{r}
+sqrt(chi2$statistic/sum(tbl))
+```
+Alternatively, you can use the `cramersv` function in `lsr` package.
+
+```{r message=FALSE,warning=FALSE}
+library(lsr)
+cramersV(tbl)
+```
+
+The **uncertainty coefficient** (also called entropy coefficient or Thiel’s U) is a measure of nominal association. It is based on the concept of information entropy.  the uncertainty coefficient ranges in [0,1]. And please read [other methods](https://rpubs.com/hoanganhngo610/558925).
+
+```{r message=FALSE,warning=FALSE}
+library(DescTools)
+UncertCoef(tbl, direction = "column")
+UncertCoef(tbl, direction = "row")
+UncertCoef(tbl, direction = "symmetric")
+```
+
+**A final question**: is it possible that the association between categorical variables is negative?

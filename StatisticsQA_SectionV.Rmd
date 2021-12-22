@@ -1,0 +1,265 @@
+---
+title: "Weird Statistics Questions"
+author: "Hai Liang - hailiang@cuhk.edu.hk"
+date: "11/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+## V.	Regression (Causal Inference)
+
+### 17. Everyone knows that correlation is not causation, when regression coefficients could be interpreted as causal effects? Is including the lagged explanatory variable a way to go?
+
+Regression models have two different purposes. One is for description, another is for causal inference. For the purpose of description, we emphasize the overall fit (e.g., $R^2$). For the purpose of causal inference, we place more emphasis on the "accurate" estimation of a focal variable on the dependent variable (i.e., the treatment effect). So, a natural question is whether it is possible to estimate the treatment effect even though the overall model fit is not so good (e.g., relatively low $R^2$). 
+
+**Example 1 (independent)**: Let's create three random variables (x1, x2, Treatment). They are independent to each other. The focal variable is "Treatment", while the dependent variable is created based on x1 and Treatment.
+
+```{r}
+x1 = rnorm(1000,2,1)
+x2 = rnorm(1000,3,1)
+Treatment = rnorm(1000,5,2)
+y = 2*x1+3*Treatment+rnorm(1000)
+```
+
+We can run a regression model including all three variables as predictors of y.
+
+```{r message=FALSE,warning=FALSE}
+library(jtools)
+summ(lm(y~x1+x2+Treatment),model.info = FALSE, model.fit = FALSE)
+```
+For sure, the $R^2$ is close to 1, and the coefficients are close to the true values. How about if only regress Treatment on y (imaging that we have no way to observe or measure x1)?
+
+```{r}
+summ(lm(y~Treatment),model.info = FALSE, model.fit = FALSE)
+```
+
+The coefficient of Treatment on y remains accurate, when other predictors are independent to Treatment.
+
+**Example 2 (dependent)**: Let's create three random variables. This time, x1 is positively correlated with x2. Actually x1 leads to x2 ($x_1 \to x_2$). Treatment is negatively dependent on x2 ($x_2 \to$Treatment).
+
+<center>
+![Causal Graph.](F1.jpg)
+
+</center>
+
+```{r}
+x1 = rnorm(1000,2,1)
+x2 = 3.1*x1 + rnorm(1000)
+Treatment = -0.9*x2 + rnorm(1000)
+y = 2*x1+3*Treatment+rnorm(1000)
+summ(lm(y~Treatment+x1+x2),model.info = FALSE, model.fit = FALSE)
+```
+
+If we measured all predictors (x1, x2, and Treatment) and included them correctly in the regression model, the estimated coefficient of Treatment should be accurate as presented above. If we miss both x1 and x2, the estimated effect of Treatment will be biased:
+
+```{r}
+summ(lm(y~Treatment),model.info = FALSE, model.fit = FALSE)
+```
+But, how to correct the bias? Should we control for both x1 and x2? The answer is "not necessary".
+
+```{r}
+m0 <- lm(y~Treatment+x2)
+m1 <- lm(y~Treatment+x1)
+export_summs(m0,m1)
+```
+
+Both models can estimate the treatment effect correctly (However, the estimation of $x_s$ is biased). Why? This is rooted in the so-called **[Backdoor Criterion](https://medium.data4sci.com/causal-inference-part-xi-backdoor-criterion-e29627a1da0e)** in causal inferences: Given an ordered pair of variables (X, Y) in a directed acyclic graph G, a set of variables Z satisfies the backdoor criterion relative to (X, Y) if no node in Z is a descendant of X, and Z blocks every path between X and Y that contains an arrow into X.
+
+Question:
+
+- Why we also consider demographics (age/gender) as control variables? ([exogenous variables](https://en.wikipedia.org/wiki/Exogenous_and_endogenous_variables) without any arrow directed to them)
+
+**Example 3 (lagged variable)**: If we don't know either x1 or x2, is a lagged variable of the Treatment sufficient to identify the causal effect? It works in some special conditions only!
+
+<center>
+![Another Causal Graph.](F2.jpg)
+
+</center>
+
+Note that x_t0 and x_t1 are unobservable.
+
+```{r}
+# two independent confounding variables
+x_t0 = rnorm(1000,1,1.5)
+x_t1 = rnorm(1000,2,1.5)
+
+# treatment and its lagged variable [simultaneous influences from x on treatment]
+Treatment_t0 = 1.5*x_t0 + rnorm(1000,3,1.2)
+Treatment_t1 = 2*Treatment_t0 + 1.5*x_t1 + rnorm(1000) # lagged var. should be auto-correlated
+
+# define y
+y = 2*Treatment_t1 + 3*x_t1 + rnorm(1000) # the treatment effect is 2
+
+summ(lm(y~Treatment_t1+Treatment_t0),model.info = FALSE, model.fit = FALSE)
+```
+
+No! The estimated effect of Treatment_t01 is bias. Notice that x_t0 actually is an [**instrumental variable**](https://en.wikipedia.org/wiki/Instrumental_variables_estimation) of x_t1 -> y. We need to use two stage least square regression (or IV regression) to estimate the treatment effect.
+
+```{r message=FALSE,warning=FALSE}
+library(ivreg)
+summary(ivreg(y~Treatment_t1|Treatment_t0))
+```
+
+The coefficient is very close to the true value 2. So, is this the solution? No, because it is very unlikely x_t0 is not correlated in x_t1. And it is likely that x_t0 can influence y directly (cross-lagged influence).
+
+<center>
+![Revised Causal Graph.](F3.jpg)
+
+</center>
+
+```{r}
+# confounding variables
+x_t0 = rnorm(1000,1,1.5)
+x_t1 = 1.8*x_t0+rnorm(1000) #x_t0->x_t1
+
+# treatment and its lagged variable [simultaneous influences from x on treatment]
+treatment_t0 = 1.5*x_t0 + rnorm(1000,3,1.2)
+treatment_t1 = 2*treatment_t0 + 1.5*x_t1 + rnorm(1000) # lagged var. should be auto-correlated
+
+# define y
+y = 2*treatment_t1 + 3*x_t1 + rnorm(1000)
+
+summ(lm(y~treatment_t1+treatment_t0),model.info = FALSE, model.fit = FALSE)
+summary(ivreg(y~treatment_t1|treatment_t0))
+```
+
+Both `lm` and `ivreg` are incorrect! How about if x does not change over time, i.e., x_t0 = x_t1.
+
+```{r}
+# confounding variables
+x = rnorm(1000,3,1.5)
+
+# treatment and its lagged variable [simultaneous influences from x on treatment]
+treatment_t0 = 1.5*x + rnorm(1000,3,1.2)
+treatment_t1 = 2*treatment_t0 + 1.5*x + rnorm(1000) # lagged var. should be auto-correlated
+
+# define y
+y = 2*treatment_t1 + 3*x + rnorm(1000)
+
+summ(lm(y~treatment_t1+treatment_t0),model.info = FALSE, model.fit = FALSE)
+```
+
+Does not work!
+
+### 18. Is a random experiment always better than other methods to identify causality? Why or why not?
+
+* Plausibility and ethics: sex manipulation?
+* Experiments also have assumptions: Randomization rules out all confounding variables
+* [Compliance](https://en.wikipedia.org/wiki/Compliance_(psychology))
+* Heterogeneous effects (lack of external validity):
+
+Suppose the treatment effect (conditions) varies across gender (`gender*cond`).
+```{r}
+cond = sample(c(0,1),1000,replace = T)
+gender = sample(c(0,1),1000,replace = T)
+y = 2*cond -1*gender*cond + rnorm(1000)
+
+pp = data.frame(y,cond,gender)
+# a random experiment based on population
+table(pp$cond)/1000
+table(pp$gender)/1000
+summ(lm(y~cond,data = pp),model.info = FALSE, model.fit = FALSE)
+```
+It does not influence the estimation of the treatment effect if we have a representative sample. However, it does not work with a biased sample.
+
+```{r}
+# a random experiment from a biased sample
+male = pp[pp$gender==1,]
+female = pp[pp$gender==0,]
+ps = rbind(male[sample(nrow(male),400),],female[sample(nrow(female),100),])
+
+table(ps$cond)/500
+table(ps$gender)/500
+summ(lm(y~cond,data = ps),model.info = FALSE, model.fit = FALSE)
+```
+
+### 19. Is it always better to control more variables than less? Should we remove non-significant variables from the regression?
+
+**Collider**: $x_1 \rightarrow x \leftarrow y$. Don't control for colliders. Controlling for colliders creates spurious correlations.
+
+```{r}
+x1 = rnorm(1000)
+x2 = rnorm(1000)
+y = 3.5*x2 + rnorm(1000)
+
+x = 3*x1+2*y+rnorm(1000) # x is a collider
+
+m0 <- lm(y~x1+x2) # correct (x1 does not influence y)
+m1 <- lm(y~x1+x2+x) # wrong (x1 influences y conditioning on x)
+export_summs(m0,m1)
+```
+
+x is significantly related to y but should not be included in the regression. It makes the irrelevant variable x1 now related to y significantly.
+
+A related question, should we include non-significant variables? If x is an irrelevant variable (to y):
+
+```{r}
+x1 = rnorm(1000)
+x2 = rnorm(1000)
+# if x is really irrelevant but correlated with x1 and x2
+x = 2.5*x1+3.5*x2+rnorm(1000)
+y = 2.5*x1 +3.5*x2 + rnorm(1000)
+
+m0 <- lm(y~x1+x2+x)
+m1 <- lm(y~x1+x2)
+export_summs(m0,m1)
+```
+
+The example demonstrated that if x is really not related to y (not caused by sampling or estimation in models), there are just some minor differences with or without including x. It is always safe the include all variables, because usually we don't know whether the insignificant variables are really non-relevant to y. 
+
+Nevertheless, there are some (minor) drawbacks by including really non-relevant variables: it will decrease $df$, increase $SE$! Not parsimony! If x is NOT correlated with x1 and x2, $SE$s will not change much (why?). 
+
+One more example, x is indeed related to y, however, the effect size is small and thus it might be nonsignficant in the regression.
+
+```{r}
+x1 = rnorm(1000,3,1)
+x2 = rnorm(1000,5,2)
+x = 3*x1+2*x2+5*rnorm(1000)
+y = 2*x1 + 3*x2 + 0.02*x+ rnorm(1000,6,2.5)
+
+m0 <- lm(y~x1+x2+x) # x is not significant but it is relevant 
+m1 <- lm(y~x1+x2) # removing the variable will bias the estimation
+export_summs(m0,m1)
+```
+
+### 20.	Should we control for mediators to estimate the treatment effect?
+
+* direct effects
+* indirect effects
+* total effects = direct + indirect effects
+
+```{r}
+x = rnorm(1000,5,1)
+m = 2*x+3*rnorm(1000)
+y = 3*x+5*m+7*rnorm(1000,6,3)
+
+# the traditional way of mediation test:
+m0 <- lm(y~x)
+m1 <- lm(y~x+m)
+export_summs(m0,m1)
+```
+
+The tradition way of mediation test is to compare the regression models with/without the mediator (i.e., `m0`, `m1`). Without mediator in `m0`, the coefficient of x is `r round(m0$coefficients['x'],digits=2)`, while it is `r round(m1$coefficients['x'],digits=2)` in `m1`, indicating the existence of partially mediation. This method is not precise, without estimation of the size and test of significance. It would be better to estimate using the _SEM_ approach.
+
+```{r message=FALSE,warning=FALSE, cache=FALSE}
+library(lavaan)
+data = data.frame(y,x,m)
+mod <- "# a path
+         m ~ a * x
+
+         # b path
+         y ~ b * m
+
+         # c direct path 
+         y ~ c * x
+
+         # indirect and total effects
+         ab := a * b
+         total := c + ab"
+
+fsem <- sem(mod, data = data, se = "bootstrap", bootstrap = 1000)
+summary(fsem)
+```
+
+The total effect is `r round(m0$coefficients['x'],digits=2)`, which is consistent with `m0`. This is the overall treatment effect. `ab` is the indirect effect (the effect of x on y via m). It is possible that x could influence y via many mechanisms. Unless, you're interested in a particular mechanism, we estimate the treatment effect without controlling for mediators.

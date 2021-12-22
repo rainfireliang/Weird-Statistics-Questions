@@ -1,0 +1,210 @@
+---
+title: "Weird Statistics Questions"
+author: "Hai Liang - hailiang@cuhk.edu.hk"
+date: "11/26/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+## IV.	Regression (GLM)
+
+### 14. How to deal with non-normally distributed dependent variables? How to interpret the coefficients?
+
+As mentioned in section III, there are many regression models in addition to OLS regression. Most regression models could be expressed as the combination of a random plus a systematic part to generate the dependent variable. As we presented in Question 10, the dependent variable in OLS regression is generated according to a normal distribution and the *mean* varies with other predictors systematically. In this sense, as long as we know the generating process (or underlying distribution) of the dependent variable, we can model the data in a regression form. We call them Generalized Regression Models (GLMs). Some commonly used models include:
+
+- Logistic Regression (DV is a binary variable, which is generated from a Bernoulli distribution)
+
+- Poisson Regression (DV is a count variable, which is generated from a Poisson distribution)
+
+- Negative Binomial (DV is a over-dispersed count variable, which is generated from a Negative Binomial distribution)
+
+- Beta Regression (DV is a percentage/proportion variable, which is generated from a Beta distribution)
+
+
+**Logistic Regression**
+
+$$Y_i \sim {\sf Bern}(\pi_i)$$
+$${\sf logit}(\pi_i)=\log(\frac{\pi_i}{1-\pi_i}) = X_i\beta_1 + \beta_0$$
+
+In logistic regression, the dependent variable $Y_i$ is generated from a Bernoulli distribution with a single parameter $\pi_i$, which is the probability of occurrence (the event of interest). The **link function** is logit (not log). It connects the predictors $X_i$ to the parameter $\pi_i$.
+
+$\beta_0$ is the log odds of the event of interest, when $X_i=0$, $e^{\beta_0}$ is the odds. $\beta_1 = \log(odds_{x+1}-\log(odds_x)$, or $e^{\beta_1} = \frac{odds_{x+1}}{odds_x}$. It reflects the change in log odds.
+
+```{r}
+# load the admission data for an example
+mydata <- read.csv("https://stats.idre.ucla.edu/stat/data/binary.csv")
+head(mydata)
+```
+
+The `glm` function in R can fit most generalized linear models. For logistic regression, we set the `family = "binomial"`:
+
+```{r message=FALSE,warning=FALSE}
+library(jtools)
+mylogit <- glm(admit ~ gre + gpa + factor(rank), data = mydata, family = "binomial")
+jtools::summ(mylogit)
+```
+
+The `jtools::summ` function are extremely useful when you want to obtain the *Pseudo-R^2^*. Since the relationships in logistic regression are non-linear. Usually, they are less intuitive to be interpreted. We can use the `margins` and `ggpredict` to estimate the predicted probabilities, which will help us to interpret the results.
+
+```{r message=FALSE,warning=FALSE}
+library(margins)
+library(ggeffects)
+
+margins(mylogit,variables = "rank")
+ggpredict(mylogit,terms = "rank")
+```
+
+For example, the marginal effects report that compare to rank1, rank2's probability to be admitted is 15.7% lower.
+
+**Poisson Regression**
+
+$$Y_i \sim {\sf Pois}(\lambda_i)$$
+$$\log(\lambda_i) = X_i\beta_1 + \beta_0$$
+$\beta_0$ is the logged average of $Y$, when $X_i=0$. $e^{\beta_0}$ is the average of $Y$.
+$\beta_1=\log(\lambda_{x+1})-\log(\lambda_x)$, or $e^{\beta_1} = \frac{\lambda_{x+1}}{\lambda_x}$.
+
+```{r}
+head(warpbreaks)
+mypois <-glm(breaks ~ wool+tension, data = warpbreaks,family = poisson)
+summ(mypois)
+```
+
+**Negative Binomial**:
+
+$$Y_i \sim {\sf NegBin}(\mu_i,r)$$
+$$\log(\mu_i) = X_i\beta_1 + \beta_0$$
+
+Both Poisson regression and Negative Binomial regression are models for count data. Therefore, the interpretation of coefficients of Negative Binomial is similar to that of Poisson regression. The difference is that $E(Y)=Var(Y)$ in Poisson distribution, while $E(Y) \neq Var(Y)$ in Negative Binomial distribution. This is governed by the dispersion parameter $r$. For large reciprocal dispersion parameter $r$, $Var(Y) \approx E(Y)$, ${\sf NegBin} \to {\sf Pois}$. The Negative Binomial distribution is especially useful to model highly skewed data.
+
+Unfortunately, we cannot use `glm` to fit a Negative Binomial model. Instead, we need to use `glm.nb` function from the `MASS` package: 
+
+```{r message=FALSE,warning=FALSE}
+library(MASS)
+library(haven) # to read stata data
+dat <- read_stata("https://stats.idre.ucla.edu/stat/stata/dae/nb_data.dta")
+head(dat)
+hist(dat$daysabs)
+```
+```{r}
+summ(mynegbin <- glm.nb(daysabs ~ math + prog, data = dat))
+```
+
+The theta parameter estimated above is the dispersion parameter. Note that R parameterizes this differently from SAS, Stata, and SPSS. The R parameter (theta) is equal to the inverse of the dispersion parameter estimated in these other software packages. Thus, the theta value of 1.022 seen here is equivalent to the 0.978 because 1/1.022 = 0.978.
+
+**Beta Regression**
+
+$$Y_i \sim {\sf Beta}(\mu_i,\phi)$$
+$${\sf logit}(\mu_i) = \log(\frac{\mu_i}{1-\mu_i}) = X_i\beta_1 + \beta_0$$
+
+Beta regression also uses logit as the link function. The distribution ranges from 0 to 1 (0 and 1 are not usually excluded). Therefore, it is useful to model percent and proportion data. We use `betareg` to fit the model. The parameter $\phi$ is a precision parameter: the higher $\phi$ the lower the variance for given *mean* $\mu$.
+
+```{r message=FALSE,warning=FALSE}
+library(betareg)
+data("FoodExpenditure", package = "betareg")
+head(FoodExpenditure)
+```
+
+```{r}
+# food/income is a proportion
+mybeta <- betareg(I(food/income) ~ income + persons, data = FoodExpenditure)
+summary(mybeta)
+```
+```{r}
+margins(mybeta)
+```
+
+Therefore, one more person leads to 2.4% increase in food consumption given the income (food/income). 
+
+### 15. Can we model the variance (instead of mean) of the dependent variable? E.g., the variance of the salary of elder people is smaller than the variance of the salary of young people, given equal salary.
+
+Recall the expression for normal regression. We simply change the systematic part by including $\sigma$:
+
+$$Y_i \sim {\sf Norm}(\mu,\sigma_i)$$
+$$\sigma_i = X_i\beta_1 + \beta_0$$
+
+In fact, we can model both $\mu_i$ and $\sigma_i$ simultaneously. We can fit the models using the `gamlss` (Generalized Additive Models for Location, Scale and Shape) package in R ([see more example here](https://www.r-bloggers.com/2021/09/why-and-how-to-model-conditional-variance-with-an-application-to-my-letterboxd-data/)).
+
+```{r message=FALSE,warning=FALSE}
+library(gamlss)
+head(mtcars)
+```
+Let's fit an OLS regression model:
+
+```{r}
+summ(lm(mpg~hp+wt,mtcars),model.info = FALSE, model.fit = FALSE)
+```
+
+Model $\sigma$ using `gamlss`. There are two formulas, one for the *mean* and another for the *standard deviation*. Set the first part as in `lm`. If you really believe that the *mean* is not related to other variables, `~1` indicates that only the intercept is included in the model (thus is a constant). The second part is `sigma.formula`, using `=~` to specify the predictors. You can specify the family, which means you can go beyond Normal distributions. Here, `family = NO()`, indicating a Normal distribution.
+
+```{r}
+myglass1 = gamlss(mpg~1,sigma.formula = ~ hp+wt, family = NO(),
+                 data=mtcars,
+                 control = gamlss.control(trace=FALSE))
+myglass2 = gamlss(mpg~hp+wt,sigma.formula = ~ hp+wt, family = NO(),
+                 data=mtcars,
+                 control = gamlss.control(trace=FALSE))
+summary(myglass1)
+summary(myglass2)
+```
+
+Another (maybe more intuitive/flexible) way is to use Bayes approach. It is easy to set the model using the `brms` packages in R. The code turns out to be very slow. Please use at your own risk. 
+
+```{r,message=FALSE,warning=FALSE}
+# library(brms)
+# myBayes <- brm(bf(mpg ~ hp + wt, sigma ~ hp+wt),
+#             data = mtcars,
+#             family = gaussian)
+# summary(myBayes)
+```
+
+### 16. What is wrong with using Z-statistics (and associated p-values) of the coefficient of a multiplicative term to test for a statistical interaction in nonlinear models with categorical dependent variables (e.g., logistic regression)?
+
+In linear models, the interaction term tests the difference between the two slopes. However, interactions in non-linear models (e.g., logistic regression) could be more complicated. Critically, in binary probit and logit, the equality of regression coefficients across groups does not imply that the marginal effects of a predictor on the probability are equal (Long & Mustillo, 2021). 
+
+```{r}
+# generate a data set with binary y
+x <- rnorm(1000)
+m <- rnorm(1000)
+prob <- binomial(link = "logit")$linkinv(.25 + .3*x + .3*m + -.5*(x*m) + rnorm(1000))
+y <- rep(0, 1000)
+y[prob >= .5] <- 1
+summ(logit_fit <- glm(y ~ x * m, family = binomial),model.info = FALSE, model.fit = FALSE) 
+```
+
+The interaction term x:m is significant. However, due to the non-linear (log) transformation, the slope differs at different values for x, thus, the **marginal effect** or **association** (in terms of probabilities) is not constant across values of x. Let's plot out the interaction effect:
+
+```{r message=FALSE,warning=FALSE}
+library(interactions)
+interact_plot(logit_fit, pred = x, modx = m, interval = T)
+```
+
+Let's calculate the marginal effect for x:
+
+```{r message=FALSE,warning=FALSE}
+summary(ef <- margins(logit_fit))
+```
+
+On average, a unit-change in x changes the predicted probability that the outcome equals 1 by `r round(summary(ef)$AME['x'],digits=2)` [(see here)](https://strengejacke.github.io/ggeffects/articles/introduction_marginal_effects.html#marginal-effects-and-predictions-1).
+
+It might be less intuitive to interpret average marginal effects, in particular for non-Gaussian models, because it is harder to understand an average effect where we actually have varying effects across the range of the focal term. Instead, it would be better to look at predictions at different values of the focal term(s), which is what `ggeffects` returns by default:
+
+```{r message=FALSE,warning=FALSE}
+ggpredict(logit_fit, "x")
+```
+
+The non-linear relationship makes the interaction effect vary. We can estimate the marginal effects (of x) based on different levels of the moderator (m):
+
+```{r}
+summary(margins(logit_fit,at = list(m=c(-2.5,0,2.5)),variables = "x"))
+```
+
+Or we can formally conduct the [Johnson-Neyman intervals and simple slopes analysis](https://interactions.jacob-long.com/). The “classic” way of probing an interaction effect is to calculate the slope of the focal predictor at different values of the moderator. When the moderator is binary, this is especially informative, e.g., what is the slope for men vs. women? But you can also arbitrarily choose points for continuous moderators.
+
+With that said, the more statistically rigorous way to explore these effects is to find the **Johnson-Neyman interval**, which tells you the range of values of the moderator in which the slope of the predictor is significant vs. nonsignificant at a specified alpha level.
+
+The `sim_slopes` function will by default find the **Johnson-Neyman interval** and tell you the predictor’s slope at specified values of the moderator; by default either both values of binary predictors or the mean and the mean +/- one standard deviation for continuous moderators.
+
+```{r}
+sim_slopes(logit_fit,pred = x, modx = m, jnplot = TRUE)
+```
