@@ -15,7 +15,7 @@ Answers to some "weird" statistics questions with R code
 ### 6. What are distribution-free tests (non-parametric tests)? We test the difference between means, can we test the difference between medians/variances? Can we test the difference between two categorical variables?
 ## III.	Regression (OLS)
 ### 7. Can regression models (why plural?) replace all the above-mentioned tests in section II?
-### 8. What is the degree of freedom? Is it possible to fit a regression model with $R^2$=1? What is over-fitting? Why should we avoid over-fitting?
+### 8. What is the degree of freedom? Is it possible to fit a regression model with R<sup>2</sup>=1? What is over-fitting? Why should we avoid over-fitting?
 ### 9. How to interpret regression coefficients (direction, magnitude/strength, significance, form)? How to interpret when predictors are categorical? How to compare regression coefficients?
 ### 10. Why is the I.I.D. assumption essential? 
 ### 11.	What if residuals are normally distributed, but the dependent variable is not? Is this possible?
