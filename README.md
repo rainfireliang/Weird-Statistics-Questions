@@ -11,7 +11,7 @@ Answers to some "weird" statistics questions with R code
 ## II.	Inferential Statistics (Tests)
 ### 3. Why can we use a sample to infer the population, under what conditions? What is a sampling distribution? Is it observable? Why does large sample size work?
 ### 4. What are the relationships between standard errors, sampling errors, confidence interval, and confidence level?
-### 5. What are the differences among T-test, Z-test, F-test, $\chi^2$-test etc.?
+### 5. What are the differences among T-test, Z-test, F-test, χ<sup>^2</sup>-test etc.?
 ### 6. What are distribution-free tests (non-parametric tests)? We test the difference between means, can we test the difference between medians/variances? Can we test the difference between two categorical variables?
 ## III.	Regression (OLS)
 ### 7. Can regression models (why plural?) replace all the above-mentioned tests in section II?
