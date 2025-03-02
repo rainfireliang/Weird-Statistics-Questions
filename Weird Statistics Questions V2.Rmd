@@ -1,0 +1,2145 @@
+---
+title: "Weird Statistics Questions"
+author: "Hai Liang - hailiang@cuhk.edu.hk"
+date: "11/26/2021"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    #toc_depth: 2
+  pdf_document:
+    fig_caption: true
+    number_sections: false
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+\newpage 
+\tableofcontents 
+\listoffigures
+\listoftables
+\newpage
+
+## I. Descriptive Statistics
+
+### 1. How can we represent and summarize a variable? Why do we calculate the *mean* and *standard deviation* for a variable? What if the variable is skewed or discrete?
+
+The most effective way to represent a variable is by visualizing it as a
+distribution histogram, which closely resembles the raw data. We usually
+use *mean* ($\mu$) to quantify the central tendency (typical value) of
+the distribution and *standard deviation* ($\sigma$) to characterize the
+degree of dispersion/spread. In addition, we use *quantiles* to measure
+locations of a distribution.
+
+Notes:
+
+-   *mean* is just one of the measures of central tendency. Another two
+    common measures are *mode* and *median*. Which measure is the most
+    appropriate to use depends on the questions and also the shape of
+    the distribution.
+
+-   *standard deviation* is defined according to the *mean*. If *mean*
+    is not clearly defined, there is no *standard deviation* either.
+    Given the association between *mean* and *standard deviation*, it is
+    also meaningless to compare *standard deviations* across data sets.
+    To compare dispersion across groups, we can use the *coefficient of
+    variation*: $CV = \sigma/\mu$.
+
+-   if the distribution curve can be described mathematically using a
+    distribution formula, the parameters of the formula will be the
+    accurate measures.
+
+For example, a Normal distribution (bell curve) could be described as
+$X \sim {\sf Norm}(\mu,\sigma)$, while a Poisson distribution (right
+skewed curve) could be described as $X \sim {\sf Pois(\lambda)}$. In a
+Normal distribution, *mean* and *standard deviation* are the two
+parameters that determine the distribution. Given the popularity of
+Normal distribution in the real world, the two parameters are commonly
+used measures to characterize data sets (represented as distribution
+histogram). In a Poisson distribution, $\lambda$ is the only parameter
+(rate parameter), which is the total number of events ($k$) divided by
+the number of units ($n$) in the data ($\lambda = k/n$).
+
+In R, we use `rnorm` and `rpois` functions to generate Normal and
+Poisson distributions respectively, by setting the respective
+parameters.
+
+```{r}
+x_norm = rnorm(1000, 10, 2) # mean = 10, sd = 2
+x_pois = rpois(1000,2.5) # lambda = 2.5
+par(mfrow=c(1,2))
+hist(x_norm,main="Norm(10,2)")
+hist(x_pois,main="Pois(2.5)")
+```
+
+As expected, the *mean*s of the generated data are close to the
+theoretical ones:
+
+```{r}
+c(mean(x_norm),mean(x_pois)) 
+```
+
+It is interesting to calculate the *standard deviation*s:
+
+```{r}
+c(sd(x_norm),sd(x_pois))
+```
+
+The *standard deviation* of the Poisson distribution is
+`r round(sd(x_pois),digits=2)`. The variance is the *standard
+deviation*^2^ = `r round(sd(x_pois)^2, digits=2)`, which is close to the
+*mean* $\lambda$. In fact, $E[X] = Var[X]$ for Poisson distribution. We
+will explain the formula soon below.
+
+Question:
+
+-   As suggested in some text books, we should use *median* or *mode* to
+    characterize the central tendency of skewed distributions. The
+    median for x_pois is `r median(x_pois)`. Is this value informative,
+    better than the *mean*?
+
+*mean* and thus *standard deviation* are not well defined for
+categorical variables. The distribution could be described as
+$f(x=k)=p_{k}$. We use the `sample` function to generate two categorical
+variables by defining $p_k$s.
+
+```{r}
+x_cat1 = sample(8:12, size = 1000, replace = TRUE, prob = c(0.25,0.1,0.3,0.25,0.1))
+x_cat2 = sample(8:12, size = 1000, replace = TRUE, prob = c(0.1,0.25,0.3,0.1,0.25))
+c(mean(x_cat1),mean(x_cat2)) #means
+c(sd(x_cat1),sd(x_cat2)) #standard deviations
+```
+
+Even though the *mean*s are hard to interpret (what does it mean if I
+say the average of race in Hong Kong is 3.1?), the above calculation
+indicates that the two variables have similar *mean*s and *standard
+deviation*s. They are actually two different distributions, as presented
+below:
+
+```{r}
+tbl_cat1 = table(x_cat1)
+tbl_cat2 = table(x_cat2)
+par(mfrow=c(1,2))
+barplot(tbl_cat1)
+barplot(tbl_cat2)
+```
+
+The best way is to calculate the frequency tables:
+
+```{r}
+tbl_cat1 = data.frame(tbl_cat1)
+tbl_cat1$Prob_x1 = tbl_cat1$Freq/sum(tbl_cat1$Freq)
+tbl_cat1$Category = paste0(tbl_cat1$x_cat1)
+t1 = tbl_cat1[,c("Category","Prob_x1")]
+
+tbl_cat2 = data.frame(tbl_cat2)
+tbl_cat2$Prob = tbl_cat2$Freq/sum(tbl_cat2$Freq)
+t1$Prob_x2 = tbl_cat2$Prob
+
+t1
+```
+
+Question:
+
+Are there any continuous distributions without *mean* or *variance*? See
+[Pareto
+distribution](https://exploringpossibilityspace.blogspot.com/2013/08/tutorial-how-fat-tailed-probability.html).
+
+If there are many distributions without "meaningful" *mean* or
+*variance*, why are they so popular measures in statistics? Let's
+introduce another concept -- Expected Value.
+
+-   For discrete distributions: $E[X] = \sum_{k=1}^n x_{k}P(X=x_{k})$.
+
+-   For continuous distributions: $E[X]=\int_{-\infty}^{\infty}xf(x)dx$.
+
+```{r}
+x = c(8:12)
+px_cat1 = tbl_cat1$Prob_x1 # estimated probs
+px_cat2 = c(0.1,0.25,0.3,0.1,0.25) # true probs
+
+EX_cat1 = sum(x*px_cat1) # expectation
+EX_cat2 = sum(x*px_cat2) # expectation
+
+EX_cat1 - mean(x_cat1) # the same
+EX_cat2 - mean(x_cat2) # slightly different
+```
+
+Are there any cases that $E[X] \neq mean(X)$? Biased samples! The
+expectation, by definition, is true (of he population), while *mean*
+might not be true in biased samples.
+
+For Normal distribution, $E[X] = \mu \approx mean$. For Poisson
+distribution, $E[X]=\lambda \approx mean$. If expectation is the only
+parameter for the distribution (e.g., $\lambda$ in Poisson), the *mean*
+suffices to characterize the distribution. That means if we know the
+parameter $\lambda$, we can recover the distribution using the formula:
+$\sf Pois(\lambda) = \frac{\lambda^ke^{-\lambda}}{k!}$. However, *mean*
+($\mu$) is not sufficient to characterize a Normal distribution because
+it varies with *standard deviation* ($\sigma$) too. For categorical
+distribution, we need $k-1$ probabilities ($p_{k}$) to characterize the
+distribution. Specifically, a binary variable with 0 and 1, we only need
+1 probability (the proportion of 1) to describe the distribution
+($E[X] = p$, $Var[X]=E[(X-E[X])^2]=p(1-p)$).
+
+Therefore, to describe a (sampled) data precisely, we need to know the
+underlying distribution (that generated the observed data) first. And
+then, we could estimate the corresponding parameters based on the
+sample. But what should we do if we don't know the underlying
+distribution?
+
+If the function is a probability distribution, then the first moment is
+the expected value (*mean*), the second central moment is the variance
+(*sd^2^*: $Var[X] = E[(X-E[X])^2]$), the third standardized moment is
+the skewness (*skewness*), and the fourth standardized moment is the
+kurtosis (*kurtosis*)...Even if the $E(X)$ is not directly
+interpretable, it remains important when we consider the relationships
+between a sample and the population (see Q3).
+
+Nevertheless, *mean* and *sd* could be interpreted in skewed
+distributions. Chebyshev’s inequality says that at least $1-1/K^2$ of
+data from a sample must fall within $K$ standard deviations from the
+*mean*, where $K$ is any positive real number greater than one.
+
+-   For $K = 2$ we have $1-1/K^2$ = 1 - 1/4 = 3/4 = 75%. So Chebyshev’s
+    inequality says that at least 75% of the data values of any
+    distribution must be within two *standard deviation*s of the *mean*.
+
+-   For $K = 3$ we have $1-1/K^2$ = 1 - 1/9 = 8/9 = 89%. So Chebyshev’s
+    inequality says that at least 89% of the data values of any
+    distribution must be within three *standard deviations* of the
+    *mean*.
+
+-   For $K = 4$ we have $1-1/K^2$ = 1 - 1/16 = 15/16 = 93.75%. So
+    Chebyshev’s inequality says that at least 93.75% of the data values
+    of any distribution must be within four *standard deviation*s of the
+    *mean*.
+
+### 2. We use correlation coefficients (why plural?) to quantify the (linear) relationships between two continuous variables, how can we measure the relationships involving categorical/rank variables?
+
+```{r}
+rv_1 = rnorm(1000,10,2)
+rv_2 = 0.5*rv_1 + rnorm(1000)
+
+cor.test(rv_1,rv_2)
+plot(rv_1,rv_2)
+```
+
+The Pearson coefficient $r$ = `r round(cor(rv_1,rv_2),digits=2)` is
+larger than 0.5. Why? $r^2=$
+`r round(cor(rv_1,rv_2)*cor(rv_1,rv_2),digits=2)` $\approx 0.5$. Now, we
+generate a non-normal variable rv_3.
+
+```{r}
+rv_3 = rpois(1000,2.5)
+rv_4 = 0.5*rv_3 + rnorm(1000)
+
+par(mfrow=c(1,3))
+hist(rv_3)
+hist(rv_4)
+plot(rv_3,rv_4)
+```
+
+We have different ways to calculate the correlation between two
+continuous variables (rank, interval, or ratio): Pearson's $r$,
+Spearman's $\rho$, and Kendall's $\tau$. [Please check the method
+definitions
+here](http://www.sthda.com/english/wiki/correlation-test-between-two-variables-in-r).
+
+```{r}
+cor.test(rv_3,rv_4,method = "pearson")
+cor.test(rv_3,rv_4,method = "spearman")
+cor.test(rv_3,rv_4,method = "kendall")
+```
+
+we can see that Pearson and Spearman correlations are roughly the same,
+but Kendall is very much different. That’s because Kendall is a test of
+strength of **dependence** (i.e. one could be written as a linear
+function of the other), whereas Pearson and Spearman are nearly
+equivalent in the way they correlate normally distributed data. All of
+these correlations are correct in their result, it’s just that Pearson
+and Spearman are looking at the data in one way, and Kendall in another.
+
+In fact, the Pearson' $r$ of the ranks of the original variables is
+equivalent to Spearman's $\rho$:
+
+```{r}
+cor(rv_1,rv_2,method = "pearson") # pearson
+cor(rank(rv_1),rank(rv_2),method = "pearson") # ranks -> pearson
+cor(rv_1,rv_2,method = "spearman") #spearman
+```
+
+Pearson's correlation ($r$) is a measure of the **linear** relationship
+between two continuous random variables. It does not assume normality
+although it does assume finite variances and finite covariance
+($Cov(X,Y) = E[(X-E(X))(Y-E(Y))]=E[XY]-E[X]E[Y]$). When the variables
+are Bivariate Normal (the sampling distribution of
+$r \sqrt{\frac{n-2}{1-r^2}}$ will follow a Student's t-distribution),
+Pearson's correlation provides a complete description of the
+association. In order words, violation of Bivariate Normal may influence
+the significance tests (when sample size is small).
+
+Spearman's correlation ($\rho$) applies to ranks and so provides a
+measure of a **monotonic** (could be non-linear) relationship between
+two continuous random variables. It is also useful with ordinal data and
+is robust to outliers (unlike Pearson's correlation). When correlating
+skewed variables, particularly highly skewed variables, a log or some
+other transformation often makes the underlying relationship between the
+two variables clearer. In such settings it may be that the raw metric is
+not the most meaningful metric anyway. Spearman's $\rho$ has a similar
+effect to transformation by converting both variables to ranks. From
+this perspective, Spearman's $\rho$ can be seen as a quick-and-dirty
+approach (or more positively, it is less subjective) whereby you don't
+have to think about optimal transformations.
+
+The two coefficients will be very different, if the relationship between
+the variable is non-linear. The following R code shows how the
+correlations between $x$ and $x^n$ differ over $n$.
+
+```{r}
+rs = sapply(1:10,function(i)cor(rv_1,rv_1^i,method = "pearson"))
+rhos = sapply(1:10,function(i)cor(rv_1,rv_1^i,method = "spearman"))
+plot(rs,ylab = "Pearson's r",xlab="x^n")
+lines(rhos)
+```
+
+Spearman's $\rho$ vs. Kendall's $\tau$ (tau). These two are so much
+computationally different that you cannot directly compare their
+magnitudes. Spearman is usually higher by 1/4 to 1/3 and this makes one
+incorrectly conclude that Spearman is "better" for a particular dataset.
+The difference between $\rho$ and $\tau$ is in their ideology,
+proportion-of-variance for $\rho$ and probability for $\tau$. $\rho$ is
+a usual Pearson's $r$ applied for ranked data. $\tau$ is more "general"
+than $\rho$, for $\rho$ is warranted only when you believe the
+underlying (model, or functional in population) relationship between the
+variables is strictly **monotonic**. While $\tau$ allows for
+**non-monotonic** underlying curve and measures which monotonic "trend",
+positive or negative, prevails there overall. $\rho$ is comparable with
+$r$ in magnitude; $\tau$ is not.
+
+```{r}
+rv_x = -0.5*rv_1^2+11*rv_1+rnorm(1000) # it is non-linear non-monotonic
+plot(rv_1,rv_x)
+
+cor.test(rv_1,rv_x, method = "pearson")
+cor.test(rv_1,rv_x, method = "spearman")
+cor.test(rv_1,rv_x, method = "kendall")
+```
+
+Cosine similarity (a kind of dependence!) between two vectors A and B is
+defined as
+$$CosSim = \frac{\sum(A_iB_i)}{(\sqrt{\sum{A_i^2}}\sqrt{\sum{B_i^2}})}$$
+
+Given any two vectors, the similarity score could be calculated in the
+following way:
+
+```{r}
+a = sum(rv_1*rv_x)
+b = sqrt(sum(rv_1*rv_1))*sqrt(sum(rv_x*rv_x))
+a/b
+```
+
+Finally, how to quantify the "correlation" (dependence is a more
+appropriate term here) between two categorical variables:
+
+```{r}
+tbl = matrix(data=c(65, 45, 20, 40), nrow=2, ncol=2, byrow=T)
+dimnames(tbl) = list(City=c('B', 'T'), Gender=c('M', 'F'))
+
+tbl
+chi2 = chisq.test(tbl, correct=T)
+c(chi2$statistic, chi2$p.value)
+```
+
+$\chi^2$ is NOT normalized. In a $k \times l$ contingency table, the
+theoretical maximal value of $\chi^2$ is $N(min(k,l)-1)$, So, we define
+**Cramer’s** $V$: $V = \sqrt{\frac{\chi^2}{N(min(k,l)-1)}}$. $V$ ranges
+from 0 to 1. Therefore,
+
+```{r}
+sqrt(chi2$statistic/sum(tbl))
+```
+
+Alternatively, you can use the `cramersv` function in `lsr` package.
+
+```{r message=FALSE,warning=FALSE}
+library(lsr)
+cramersV(tbl)
+```
+
+The **uncertainty coefficient** (also called entropy coefficient or
+Thiel’s U) is a measure of nominal association. It is based on the
+concept of information entropy. the uncertainty coefficient ranges in
+[0,1]. And please read [other
+methods](https://rpubs.com/hoanganhngo610/558925).
+
+```{r message=FALSE,warning=FALSE}
+library(DescTools)
+UncertCoef(tbl, direction = "column")
+UncertCoef(tbl, direction = "row")
+UncertCoef(tbl, direction = "symmetric")
+```
+
+**A final question**: is it possible that the association between
+categorical variables is negative?
+
+\newpage
+
+## II. Inferential Statistics (Tests)
+
+### 3. Why can we use a sample to infer the population, under what conditions? What is a sampling distribution? Is it observable? Why does large sample size work?
+
+A simple random sample from a population could be used to estimate the
+population characteristics.
+
+```{r}
+# generate a random variable according to normal distribution with mean = 15 and sd = 3 
+# assume as the population
+rv_1 = rnorm(1000,15,3)
+c(mean(rv_1),sd(rv_1),median(rv_1)) #true mean/sd/median
+
+# generate random samples from rv_1 (the population)
+s_1 = sample(rv_1,100)
+c(mean(s_1),sd(s_1),median(s_1))
+
+s_2 = sample(rv_1,100)
+c(mean(s_2),sd(s_2), median(s_2))
+
+s_3 = sample(rv_1,100)
+c(mean(s_3),sd(s_3), median(s_3))
+```
+
+The estimates are close to the true values, thought not always the same.
+Let's repeat sampling many times ($N\to +\infty$) and plot the **sample
+means** ($\overline{X}$)--the *mean*s of all samples?
+
+```{r}
+stats = matrix(NA,nrow = 1000,ncol = 3)
+
+for (i in 1:1000){
+  s = sample(rv_1,100) # sample size = 100
+  stats[i,] = c(mean(s),sd(s),median(s))
+}
+
+par(mfrow=c(1,3))
+hist(stats[,1],main="mean",xlab="Values")
+hist(stats[,2],main="standard deviation",xlab="Values")
+hist(stats[,3],main="median",xlab="Values")
+```
+
+We call these **sampling distributions (SMD)** of *means*, *sds*, and
+*medians*. All these distributions should be Normal. And then, it is
+straightforward to calculate the *mean* and *sd* of the distributions.
+For the first one, the sampling distribution of *means*:
+
+```{r}
+mean(stats[,1])
+```
+
+It is almost the same to the population mean. How about the means of of
+the second and third distributions (sampling distributions of standard
+deviations and medians)? The pattern remains!
+
+```{r}
+c(mean(stats[,2]),mean(stats[,3]))
+```
+
+Does the pattern apply to non-normal distributions? Let's simulate a
+Poisson variable:
+
+```{r}
+rv_2 = rpois(1000,2.5)
+hist(rv_2)
+```
+
+Repeat the previous process:
+
+```{r}
+# samples
+stats = matrix(NA,nrow = 1000,ncol = 3)
+
+for (i in 1:1000){
+  s = sample(rv_2,100) # sample size = 100
+  stats[i,] = c(mean(s),sd(s),median(s))
+}
+
+par(mfrow=c(1,3))
+hist(stats[,1],main="mean",xlab="Values")
+hist(stats[,2],main="standard deviation",xlab="Values")
+hist(stats[,3],main="median",xlab="Values")
+c(mean(stats[,1]),mean(stats[,2]),mean(stats[,3]))
+```
+
+Sample size $n$ vs. sampling times $N$: $N \to +\infty$,
+$SMD \to {\sf Norm}(\mu,\sigma/\sqrt{n})$; $n$ approaches the population
+size, the *standard deviation* of the distribution approaches to 0. Why?
+**Central Limit Theorem (CLT)**: $\mu_s = \mu$,
+$\sigma_s = \frac{\sigma}{\sqrt{n}}$, where $\mu_s$ is the mean of the
+sampling distribution, $\sigma_s$ is the standard deviation of the
+sampling distribution.
+
+```{r}
+# define a function and change n and N:
+clt_exper = function(n,N){
+  means = c()
+for (i in 1:N){
+  s = sample(rv_1,n)
+  means = c(means,mean(s))
+}
+  return(means)
+}
+
+# plot the histograms
+par(mfrow=c(2,3))
+hist(clt_exper(80,10),main = "n=80,N=10")
+hist(clt_exper(80,100),main = "n=80,N=100")
+hist(clt_exper(80,1000),main = "n=80,N=1000")
+hist(clt_exper(800,10),main = "n=800,N=10")
+hist(clt_exper(800,100),main = "n=800,N=100")
+hist(clt_exper(800,1000),main = "n=800,N=1000")
+```
+
+As you can see, large sampling times $N$ leads to more "normal"
+distributions, while large sample size $n$ leads to smaller variance of
+the distributions.
+
+```{r}
+c(mean(clt_exper(80,1000)),mean(clt_exper(800,1000)))
+c(sd(clt_exper(80,1000)),sd(clt_exper(800,1000)))
+```
+
+The increase of sample size didn't change the means, however, it
+decreased the *standard deviation* from
+`r round(sd(clt_exper(80,1000)),digits=2)` to
+`r round(sd(clt_exper(800,1000)),digits=2)`
+
+### 4. What are the relationships between standard errors, sampling errors, confidence interval, and confidence level?
+
+The difference between the sample statistic and the population parameter
+is considered the **sampling error**. In a sampling distribution of
+means, where $\mu_s \to \mu$, when $\sigma_s \to 0$ ($n \to N$).
+
+```{r}
+sdm = clt_exper(800,1000)
+ms = mean(sdm)
+quantile(sdm,probs=c(0.025,0.975))
+```
+
+That means 95% of the sample means are within [14.95,15.14]. Given the
+sample distribution is a Normal distribution, 95% of the sample means
+should be around $\mu$: $[\mu-1.96\sigma,\mu+1.96\sigma]$ $\approx$
+$[\mu_s-1.96\sigma_s,\mu_s+1.96\sigma_s]$. The standard deviation of the
+sampling distribution ($\sigma_s$) is called **standard error** ($SE$).
+
+```{r}
+ms-1.96*sd(sdm)
+ms+1.96*sd(sdm)
+```
+
+In practice, it is nearly impossible to observe the sampling
+distribution directly, therefore, we don't know the *mean* of the
+sampling distribution ($\mu_s$), the *standard deviation* of sampling
+distribution ($\sigma_s$), population *mean* ($\mu$), or population
+*standard deviation* ($\sigma$). What we know is the *mean* of a sample
+($\overline{x}$), and the *standard deviation* of a sample ($s$).
+
+For example, in sample 1 (s_1), the *mean* is
+`r round(mean(s_1),digits=2)`, *standard deviation* is
+`r round(sd(s_1),digits=2)`. We know both are different from the
+population *mean* and *standard deviation*
+(`r round(mean(rv_1),digits=2)`, `r round(sd(rv_1),digits=2)`). But if
+we say the *mean* of any sample `r round(mean(s_1),digits=2)` is the
+true *mean*, how likely we are wrong? We should based on the **CLT**,
+imaging the sampling distribution, and then we have
+($SE=\sigma_s = \frac{\sigma}{\sqrt{n}}$):
+
+$$CI_{1-\alpha} = \overline{x} \pm Z_{\alpha/2} \cdot SE = \overline{x} \pm Z_{\alpha/2} \frac{\sigma}{\sqrt{n}}$$
+We usually call $\pm Z_{\alpha/2} \cdot SE$ **sampling error**. If
+$\alpha = 5\%,1-\alpha = 95\%,Z_{\alpha/2} \approx 1.96, \sigma \approx s$
+(it is just convenient to use $s$ to replace $\sigma$), we will have the
+**95% confidence interval**:
+
+$$CI_{95\%} = \overline{x} \pm 1.96 \frac{s}{\sqrt{n}}$$
+
+```{r}
+m = mean(s_1)
+s = sd(s_1)
+m-1.96*s/sqrt(100)
+m+1.96*s/sqrt(100)
+```
+
+You will find that the true mean `r round(mean(rv_1),digits=2)` is
+within the 95% confidence interval
+[`r round(m-1.96*s/sqrt(100),digits=2)`,`r round(m+1.96*s/sqrt(100),digits=2)`].
+Is it possible that for some ((random) samples, the true mean is not in
+the calculated confidence interval? The answer is yes and we even know
+the probability IS *5%*.
+
+### 5. What are the differences among T-test, Z-test, F-test, $\chi^2$-test etc.?
+
+A test statistic ($TS$) is a measure of the difference between the
+observed data and what we expected from the null hypothesis (by chance).
+The test statistic gets bigger (in absolute value) as the observed data
+looks unusual compared the null hypothesis. So a large test statistics
+cast doubt on the null hypothesis. There are many different kinds of
+tests.
+
+$$TS = \frac{Observed \space value-Expected \space value}{SE}$$ If
+$TS>1.96$ =\> $p <.05$; $TS> 2.58$ =\> $p <.01$ Why? For example, in
+Z-test, $Z=\frac{\overline{x}-u_0}{SE} \sim {\sf Norm}(0,1)$. Therefore,
+$Z=\frac{\overline{x}-u_0}{SE}>1.96$. And then,
+$(\overline{x}-u_0)>1.96 \cdot SE$ =\> $\overline{x}>u_0+1.96 \cdot SE$.
+In a Normal distribution, only 2.5% values could be larger than
+$1.96 \cdot SE$. So, it is very likely that $\overline{x}>u_0$. In a
+Z-test, $SE=s/\sqrt{n}$.
+
+What are the differences? The distributions of the test statistics. When
+the sample size $n$ is relatively small,
+$T=\frac{\overline{x}-u_0}{SE} \sim {\sf StudentT}(\nu,0,1)$, where
+$\nu = n-1$ is the degree of freedom: $n \to +\infty$, then
+${\sf StudenT} \to {\sf Norm}$
+
+```{r}
+# whether mu>14
+t.test(s_1,mu=14,alternative="less")
+
+# whether the two samples have equal means:
+t.test(s_1,s_2)
+
+# we don't assume equal length of the two vectors:
+t.test(s_1,rv_1)
+```
+
+Before we perform a T/Z-test, we need to check assumptions:
+
+-   measurement scales: ratio or interval
+
+-   simple random sample
+
+-   normality (the distribution of sample means!)
+
+-   large sample size
+
+-   homogeneity of variance (equal variance)
+
+Why does it require a Normal distribution? The t-test is invalid for
+small samples from non-normal distributions, but it is valid for large
+samples from non-normal distributions [(see online
+answers)](https://stats.stackexchange.com/questions/9573/t-test-for-non-normal-when-n50).
+
+Let's try Poisson distribution:
+
+-   generate a variable with a Poisson distribution
+
+-   draw a random sample (sp)
+
+-   calculate the *mean* difference between the sample and the
+    population: `mean(sp)-mean(rv_2)`
+
+-   standard error is the population *sd* divided by the square root of
+    sample size
+
+-   get the Z score
+
+```{r}
+zs = c()
+
+for (i in 1:1000){
+  sp = sample(rv_2,100) # rv_2 here is a poisson distribution we generated before
+  m = mean(sp)-mean(rv_2)
+  se = sd(sp)/sqrt(100)
+  z = m/se
+  
+  zs= c(zs,z)
+}
+
+par(mfrow=c(1,2))
+hist(rv_2, main="Pois(2.5)")
+hist(zs,main = "Z-score")
+```
+
+The above example shows that the Z-score of a skewed variable is also
+normally distributed.
+
+Why does it require equal variance (only for two-sample tests)?
+$T=\frac{\overline{x}-u_0}{SE} \sim {\sf StudentT}(\nu,0,1)$, where
+$SE = s/\sqrt(n)$. We extend this to two-sample-mean comparison:
+$T=\frac{\overline{x}_1-\overline{x}_2}{SE} \sim {\sf StudentT}(\nu,0,1)$.
+It is easy to calculate the sample *mean*s ($\overline{x}_1$ and
+$\overline{x}_2$) and sample *standard deviation*s ($s_1$ and $s_2$).
+The problem is how to calculate $SE$. If the two samples are independent
+to each other, according to the **Variance Sum Law**:
+
+$$\sigma_{x1 \pm x2}^2 = \sigma_{x1}^2+\sigma_{x2}^2$$
+
+Therefore, $SE_{x1-x2}=\sqrt{s_1^2/n_1 + s_2^2/n_2}$. If equal variances
+are assumed, then
+$SE_{x1-x2} = \sqrt{\frac{(n_1-1)s_1^2+(n_2-1)s_2^2}{n_1+n_2-2}}$
+(pooled variance estimate). The following example tests two samples from
+different distributions (different *mean*s and *variance*s too).
+
+```{r}
+zs_un = c() # z scores unequal variance
+zs_eq = c() # z scores equal variance
+
+for (i in 1:1000){
+  sp_1 = sample(rv_1,100) # rv_1 normal
+  sp_2 = sample(rv_2,100) # rv_2 poisson
+  
+  # mean difference
+  m = mean(sp_1)-mean(sp_2)
+  
+  # sample sds
+  se_1 = sd(sp_1)
+  se_2 = sd(sp_2)
+  
+  # unequal var.
+  se_un = sqrt(se_1^2/100+se_2^2/100)
+  # equal var.
+  se_eq = sqrt(99*(se_1+se_2)/198)
+  
+  z_un = m/se_un
+  z_eq = m/(se_eq*sqrt(2/100))
+  
+  zs_un = c(zs_un,z_un)
+  zs_eq = c(zs_eq,z_eq)
+}
+
+par(mfrow=c(1,2))
+hist(zs_un,main="Z-score (Unequal Variance)")
+hist(zs_eq,main="Z-score (Equal Variance)")
+c(mean(zs_un),mean(zs_eq))
+```
+
+Both scores followed the Normal distribution, while it appears the equal
+variance method tends to overestimate the significance than the unequal
+variance method, because `mean(zs_eq) > mean(zs_un)`.
+
+Based on "extensive"
+[simulations](https://stats.stackexchange.com/questions/305/when-conducting-a-t-test-why-would-one-prefer-to-assume-or-test-for-equal-vari)
+from distributions either meeting or not meeting the assumptions imposed
+by a t-test, (normality and homogeneity of variance) that the
+Welch-tests performs equally well when the assumptions are met (i.e.,
+basically same probability of committing alpha and beta errors) but
+outperforms the t-test if the assumptions are not met, especially in
+terms of power. Therefore, they recommend to always use the Welch-test
+if the sample size exceeds 30.
+
+```{r}
+t.test(sp_1,sp_2,var.equal = T)
+t.test(sp_1,sp_2,var.equal = F)
+```
+
+How about the two samples are dependent? Paired T-test. If more than two
+samples, use F-test in ANOVA (equal or unequal variances?). If both
+categorical variables, then $TS \to \chi^2(k)$, where $k$ is the degree
+of freedom.
+
+### 6. What are distribution-free tests (non-parametric tests)? We test the difference between means, can we test the difference between medians/variances? Can we test the difference between two categorical variables?
+
+The problem that we cannot always use T-test is not because of its
+non-normality or unequal variances but *mean* is not well defined.
+Furthermore, for some test statistics (e.g., *mean difference*), we know
+they follow certain types of distributions. However, for others, we
+don't know. The distribution in distribution-free does not mean the
+distribution of the variables but the distribution of the
+test-statistics. The below distribution is a mixture of two Normal
+distributions. The *mean* is not the most important characteristic.
+
+```{r}
+v_1 = rnorm(500,5,1)
+v_2 = rnorm(500,10,1)
+v_3 = c(v_1,v_2)
+hist(v_3,main="Mixture of two normal distributions")
+mean(v_3)
+```
+
+```{r}
+# we define another variable in similar way:
+v_4 = c(rnorm(500,4,1),rnorm(500,11,1))
+hist(v_4)
+mean(v_4)
+```
+
+As expected, there is no difference in *mean*s.
+
+```{r}
+t.test(v_3,v_4) # no difference of mean
+```
+
+How about quantiles? Are they different?
+
+```{r}
+quantile(v_3)
+quantile(v_4)
+
+par(mfrow=c(1,2))
+boxplot(v_3,ylim=c(0,14))
+boxplot(v_4,ylim=c(0,14))
+```
+
+Yes, quantiles are informative. And the boxplots also suggest that the
+variances are different. However, what are the standard errors ($SEs$)
+of quantiles (or other quantities if defined)? Even if we know the $SE$,
+it remains unknown about the distribution of the test statistics. An
+easy way is to to perform the randomization test, which is one of the
+most commonly used non-parametric tests.
+
+The below code shows an example of testing variance difference using
+randomization test (use `var.test` for a parametric test):
+
+1.  given any two variables: x1, x2
+
+2.  calculate the difference of standard deviation: `sd(x1)-sd(x2)`
+
+3.  Permutation
+
+    -   combine two variables to a single one: values = c(x1,x2)
+
+    -   randomly permute the values
+
+    -   split the permuted values into two groups and calculate the
+        difference again
+
+    -   repeat many time
+
+4.  compare the real difference with the differences after permutation
+
+```{r message=FALSE,warning=FALSE}
+sts = sd(v_3)-sd(v_4)
+sds_all = c()
+
+for (i in 1:1000){ #repeat many times
+  values = c(v_3,v_4) # combine all values
+  pv = sample(values) # randomly permute the values
+  sds = sd(pv[1:500])-sd(pv[501:1000]) # split into two groups and calculate the difference of sds
+  sds_all = c(sds_all,sds) 
+}
+
+hist(sds_all,xlim=c(-1,1))
+abline(v=sts,col="red")
+
+table(sts<sds_all)/1000 # probability of true!
+```
+
+It means that the observed difference is smaller than 100% of the
+permuted differences. In other words, it is very unlikely the observed
+variance difference is caused by chance.
+
+Another method is to use bootstrapping:
+
+1.  given two variables: x1, x2
+
+2.  calculate the difference: `sd(x1)-sd(x2)`
+
+3.  bootstrap:
+
+    -   resample from x1 and x2
+
+    -   calculate the difference in the subsamples
+
+    -   repeat many times
+
+4.  compare the real difference with the differences after permutation
+
+We don't need to do step 3 from the scratch because we can use the
+`boot` package in r.
+
+```{r message=FALSE,warning=FALSE}
+library(boot)
+data = data.frame(v_3,v_4)
+sts = function(d,i){
+  d2=d[i,]
+  dis = sd(d2$v_3)-sd(d2$v_4)
+  return(dis)
+}
+boot_sd = boot(data,sts,R=1000) # define the data, define the test statistic, repetition times
+boot_sd
+boot.ci(boot.out = boot_sd, type = c("norm", "basic", "perc", "bca"))
+plot(boot_sd)
+```
+
+**Randomization tests** take the set of scores, randomize their
+ordering, and compute statistics from the results. **Permutation tests**
+do the same thing, but I reserve that label for tests in which we take
+all possible permutations of the data, rather than a subset or
+rearrangements. **Bootstrapping** resamples with replacement from a set
+of data and computes a statistic (such as the mean or median) on each
+resampled set. Bootstrapping is used primarily for parameter estimation.
+Bootstrapping is primarily focused on estimating population parameters,
+and it attempts to draw inferences about the population(s) from which
+the data came. Randomization approaches, on the other hand, are not
+particularly concerned about populations and/or their parameters.
+Instead, randomization procedures focus on the underlying mechanism that
+led to the data being distributed between groups in the way that they
+are [(click here for a more detailed
+introduction)](https://www.uvm.edu/~statdhtx/StatPages/ResamplingWithR/ResamplingR.html).
+
+Randomization Tests (Contingency Tables): (Fisher's Exact Test).
+[Fisher's exact
+test](https://en.wikipedia.org/wiki/Fisher%27s_exact_test) is a
+statistical test used to determine if there are nonrandom associations
+between two categorical variables.
+
+```{r}
+tbl = matrix(data=c(65, 45, 20, 40), nrow=2, ncol=2, byrow=T)
+dimnames(tbl) = list(City=c('B', 'T'), Gender=c('M', 'F'))
+tbl
+chisq.test(tbl)
+fisher.test(tbl)
+```
+
+Odds ration: $OR = \frac{65/20}{45/40} = \frac{65\times40}{45\times20}$.
+The odds ratio shows how many times more positive cases (Male in city
+B + Female NOT in B) occur than negative cases (Male NOT in B + Female
+in B).
+
+*Bootstrapping for correlation coefficients*. Recall that we don't
+assume normality of variables to calculate correlation coefficients
+(particularly Pearson's $r$). However, it might influence the
+significance test (or estimation of confidence interval).
+
+```{r}
+# generate two highly skewed variables
+r1 = rweibull(1000,0.5)
+r2 = 0.5*r1 + rweibull(1000,0.5)
+data = data.frame(r1,r2)
+
+# calculate the correlation coefficients
+cor.test(r1,r2)
+cor.test(rank(r1),rank(r2))
+```
+
+Please note that the confidence interval of the rank correlation is more
+narrow than that of Pearson's correlation. Alternatively, we test the
+significance of the coefficients using bootstrapping (without assuming
+that how the sampling $r$s distributed).
+
+```{r}
+# define the statistics:
+rs_1 = function(d,i){
+  d2=d[i,]
+  r = cor(d2$r1,d2$r2,method="pearson")
+  return(r)
+}
+
+rs_2 = function(d,i){
+  d2=d[i,]
+  r = cor(d2$r1,d2$r2,method="spearman")
+  return(r)
+}
+
+# run bootstrapping
+boot_r1 = boot(data,rs_1,R=1000) # define the data, define the test statistic, repetition times
+boot_r2 = boot(data,rs_2,R=1000) # define the data, define the test statistic, repetition times
+
+# obtain confidence interval
+boot.ci(boot.out = boot_r1, type = c("norm", "basic", "perc", "bca"))
+boot.ci(boot.out = boot_r2, type = c("norm", "basic", "perc", "bca"))
+```
+
+### 7. Equivalence Tests: Is it possible to test equivalence statistically (accept vs. reject NULL hypothesis)?
+
+In conventional hypothesis testing, the null hypothesis is typically
+expressed as a statement of no effect or no difference between groups
+(i.e., $H_0: \mu_1 = \mu_2$). We conduct hypothesis tests to determine
+whether there is enough evidence to reject the null hypothesis in favor
+of an alternative hypothesis that suggests a significant effect or
+difference (i.e., $H_1: \mu_1 \neq \mu_2$). Even we cannot reject the
+null hypothesis, we cannot say that the two groups are equivalent.
+
+We never **"accept" the null hypothesis (**$H_0$) when the p-value is
+greater than the significance level (e.g., $p > 0.05$). Instead, we
+**fail to reject the null hypothesis**. A failure to reject $H_0$ could
+occur due to:
+
+-   Lack of statistical power (e.g., small sample size).
+
+-   High variability in the data.
+
+-   A true null effect.
+
+However, in some cases, researchers may be interested in demonstrating
+that the effect or difference between groups is statistically
+equivalent. This is where equivalence testing comes into play.
+Equivalence testing is used to determine whether the difference between
+two groups is within a predefined range of equivalence, i.e.,
+
+-   Alternative Hypothesis ($H_1$): $\mu_1 = \mu_2$
+-   Null Hypothesis ($H_0$): $\mu_1 \neq \mu_2$
+
+Let's simulate two groups of data and perform a traditional t-test:
+
+```{r}
+# Example data
+# Group 1 
+set.seed(123)  # Set seed for reproducibility
+group1 <- rnorm(20, mean = 100, sd = 15)  # Mean = 100, SD = 15
+
+# Group 2 
+group2 <- rnorm(20, mean = 101, sd = 15)  # Mean = 101, SD = 15
+
+# Perform a traditional t-test
+t_test_result <- t.test(group1, group2, paired = FALSE)
+
+# Print the t-test result
+print(t_test_result)
+```
+
+Although the mean of group 2 is 1 larger than that of group 1, the t-test indicates that we cannot reject the null hypothesis ($H_0: \mu_1 = \mu_2$). However, we cannot say that the two groups are equivalent based on this result.
+
+Now, let's perform an equivalence test to determine whether the difference between the two groups is within a predefined range of equivalence (e.g., ±5).
+
+```{r}
+# Install and load the TOSTER package
+if (!require("TOSTER")) {
+  install.packages("TOSTER")
+}
+library(TOSTER)
+# Perform a TOST equivalence test
+# Equivalence margin (Δ): ±5
+eqv = t_TOST(x = group1, y = group2, eqb = 5, alpha = 0.05)
+plot(eqv)
+print(eqv)
+describe(eqv)
+```
+
+It is "weird" the mean difference between the two groups is neither different (according to the t-test) nor equivalent (according to TOST). It is inconclusive. The reason is that the sample size is too small to make a decision. In general, equivalence tests require a larger sample size than traditional hypothesis tests. The larger the sample size, the more likely we are to detect small differences between groups. 
+
+\newpage
+
+## III. Regression (OLS)
+
+### 8. Can regression models (why plural?) replace all the above-mentioned tests in section II?
+
+The commonly used Ordinary Least Square (OLS) regression is just one of
+the many regression models, as we will explain the details in section
+IV. But as we have already known that Logistic Regression is different
+from OLS regression.
+
+In section II, we introduced several statistics, basically comparing the
+difference of *mean*s: Z and T for two groups and F for more than two
+groups. In a regression framework, the dependent variable is a
+continuous variable, while the independent variable is a categorical
+variable.
+
+Compare `t.test` with `lm`:
+
+```{r}
+head(sleep) # load the sleep data
+t.test(extra~group,data=sleep,var.equal = T) # assume equal variance
+summary(lm(extra~group,data=sleep))
+```
+
+Note that both $t$ and $p$ values are similar. In addition, the mean
+difference 2.33-0.75 = 1.58, which is the regression coefficient.
+
+How about the situation with more than 2 groups (using F-test in `avo`)?
+
+```{r}
+head(npk)
+aggregate(yield~block,npk,mean)
+summary(aov(yield~block,data=npk))
+summary(lm(yield~block,data=npk))
+```
+
+This is straightforward because `lm` actually reported F-test statistics
+as well. They are exactly the same thing!
+
+How about non-normal distribution?
+
+```{r}
+# generate data
+g1 = rpois(500,2.5)
+g2 = rpois(500,3.5)
+dv = c(g1,g2)
+groups = c(rep(1,500),rep(0,500))
+d = data.frame(dv,groups)
+
+# compare the two outputs
+t.test(dv~groups,d)
+summary(lm(dv~groups,d))
+```
+
+Testing for categorical variables (contingency tables) requires a
+regression model that we are less familiar with. We create a contingency
+table with two variables: city and gender. To test the dependence
+between the two, we use either $\chi^2$-test (parametric) or Fisher's
+exact test (non-parametric).
+
+```{r}
+tbl = matrix(data=c(65, 45, 20, 40), nrow=2, ncol=2, byrow=T)
+dimnames(tbl) = list(City=c('B', 'T'), Gender=c('M', 'F'))
+tbl
+chisq.test(tbl)
+fisher.test(tbl)
+```
+
+Since this is just a 2 by 2 table, theoretically speaking, we can use
+logistic regression if we know the pre-aggregated data. We consider the
+frequencies in the contingency table the dependent variable and the city
+and gender as independent variables. Given the dependent variable is a
+count variable, as we will explain in section IV, we use a poisson
+regression to fit the data.
+
+```{r}
+## log linear model
+ctbl = data.frame(freq = c(65, 45, 20, 40), city = c("B","B","T","T"), gender = c("M","F","M","F"))
+summary(logLM <- glm(freq ~city*gender, family=poisson(link="log"), data=ctbl))
+```
+
+The interaction coefficient (cityT:genderM = -1.0609) indicate the
+dependence between gender and city. In fact, log-linear is an extension
+of the $\chi^2$-test.
+
+### 9. What is the degree of freedom? Is it possible to fit a regression model with $R^2$=1? What is over-fitting? Why should we avoid over-fitting?
+
+Degrees of freedom ($df$) are the number of independent values that a
+statistical analysis can estimate. You can also think of it as the
+number of values that are free to vary as you estimate parameters.
+Typically, the degrees of freedom equals your sample size minus the
+number of parameters you need to calculate during an analysis ($N-P$).
+Degrees of freedom is a combination of how much data you have and how
+many parameters you need to estimate. It indicates how much independent
+information goes into a parameter estimate. In this vein, it’s easy to
+see that you want a lot of information to go into parameter estimates to
+obtain more precise estimates and more powerful hypothesis tests. So,
+you want many $df$!
+
+```{r}
+# generate a data sets with 3 IVs and y
+x1 = rnorm(100,5,1)
+x2 = rnorm(100,1,1)
+x3 = rnorm(100,2,2)
+y = 2*x1+1.5*x2+1.1*x3+rnorm(100) # sample size = 100
+data = data.frame(y,x1,x2,x3)
+
+# fit a linear model with 2 variables and find the df.
+summary(lm(y~x1+x2,data = data)) # df = 100-3 (why 3 not 2?)
+```
+
+Please note that the degree of freedom is 97, instead of 100-2 = 98. For
+a typical OLS regression, an intercept is estimated by default. How
+about if we only have 3 observations? Theoretically speaking, $df$ = 3-3
+= 0. As presented below, NAs were produced in `lm`. Actually, a model
+with $df=0$ is a just identified model with unique solution and the
+$R^2$ should be 1.
+
+```{r}
+summary(lm(y~x1+x2,data = data[sample(100,3),])) # 3 observations
+summary(lm(y~x1+x2,data = data[sample(100,4),])) # 4 observations
+```
+
+As $df \to 0$, the $R^2 \to 1$, even though it is not significant. The
+`lm` function only works for $df>0$. Nevertheless, we can solve the
+linear system mathematically when $df=0$ (we cannot do that when
+$df<0$).
+
+```{r message=FALSE,warning=FALSE}
+library(matlib)
+
+slice = data[sample(100,3),] # select the first 3 observations
+A = as.matrix(slice[,2:3]) # IVs as matrix
+b = slice$y # dependent variable 
+Solve(A, b) # solve the function 
+```
+
+In statistics, over-fitting is "the production of an analysis that
+corresponds too closely or exactly to a particular set of data, and may
+therefore fail to fit additional data or predict future observations
+reliably". An over-fitted model is a statistical model that contains
+more parameters than can be justified by the data (i.e., small $df$).
+The essence of over-fitting is to have unknowingly extracted some of the
+residual variation (i.e., the noise) as if that variation represented
+underlying model structure.
+
+How is this possible? In our case, we know how the data was generated
+according to $y = 2x_1+1.5x_2+1.1x_3+\varepsilon$. If we measured all
+$x_i$, we will find a perfect solution. Let's include all three
+predictors:
+
+```{r}
+summary(lm(y~x1+x2+x3,data))
+```
+
+The $R^2=$ is not 1, given the existence of
+$\varepsilon \sim {\sf Norm}(0,1)$. Otherwise, it is a deterministic
+models (in contrast to probabilistic). Let's generate y2 without the
+random error ($\varepsilon$).
+
+```{r}
+y2 = 2*x1+1.5*x2+1.1*x3
+summary(lm(y2~x1+x2+x3))
+```
+
+Now, the $R^2$ is 1. Is this just-identified model ($df=0$), a perfect
+model (deterministic), or over-fitted model? Let's show another $R^2=1$
+example that it is an over-fitted model.
+
+```{r}
+# create a categorical variable with 50 levels in the 'data'
+data$v1 = as.factor(c(1:50,1:50))
+summary(aov(x3~v1,data))
+```
+
+The new variable is not associated with any $x_i$. Regress v1 on y:
+
+```{r}
+# fit the first 50 observations
+model1<-lm(y~v1,data[1:50,]) 
+summary(model1)$r.squared           
+```
+
+We can achieve $R^2=1$ without any information from $x_i$! Is this a
+good model? Let's use "model1" to predict the rest of 50 ys in the data
+set.
+
+```{r}
+# predict using other 50 observations (xs)
+y_predict = predict(model1,data[51:100,])
+
+# compare predicted and true values
+y_real = y[51:100]
+cor(y_real,y_predict)^2 #correlation between predicted and true values
+plot(y_real,y_predict)
+```
+
+Even though model1 is a perfect model for the first 50 observations, the
+model is not applicable to the second 50 observations. In this case, we
+say model1 is an over-fitted model.
+
+### 10. How to interpret regression coefficients (direction, magnitude/strength, significance, form)? How to interpret when predictors are categorical? How to compare regression coefficients?
+
+```{r}
+# to generate a data set with both continuous and categorical variables
+x1 = rnorm(1000,10,2)
+x2 = rnorm(1000,7,3)+0.5*x1
+x3 = rbinom(1000,1,0.3)
+x4 = sample(1:3, size = 1000, replace = TRUE, prob = c(0.2,0.5,0.3))
+
+#dummy coding for x4
+x41 = ifelse(x4==1,1,0)
+x42 = ifelse(x4==2,1,0)
+x43 = ifelse(x4==3,1,0)
+
+# dependence between x and y
+y = -2.2*x1+2.2*x2+3.3*x3+4*x42+8*x43+rnorm(1000)
+
+# create the data frame
+data = data.frame(y,x1,x2,x3,x4,x41,x42,x43)
+```
+
+Let's fit an OLS regression using `lm` and try to interpret the
+coefficients according to the direction (positive or negative),
+magnitude (weak or strong), form (linear or nonlinear), and significance
+(significant or not).
+
+```{r}
+summary(m <- lm(y~x1+x2+x3+factor(x4)))
+```
+
+The coefficient for $x_3$ indicates the difference of $y$ between
+$x_3=1$ and $x_3=0$. Then, what does the coefficient for $x4=3$ mean?
+Does it indicate the difference between $x4=3$ and
+$x4=1 \space or \space 2$?
+
+```{r}
+#calculate the means for each category
+aggregate(y~x4,data,mean)
+```
+
+Using standardized coefficients $\beta s$ for comparisons. It is easy to
+calculate $\beta s$ using the `lm.beta` function.
+
+```{r message=FALSE,warning=FALSE}
+library(lm.beta)
+betas = lm.beta(m)
+betas
+```
+
+We see that the absolute value of raw coefficient of x1 is close to that
+of x2, however, it is smaller in terms of the standardized coefficients.
+So, can we say $|\beta_{x_2}|-|\beta_{x_1}|$ and $x_2$ shows a greater
+impact on $y$? We still need a significance test, which requires the
+$SE$. The full version of the **Variance Sum Law**:
+
+$$Var(c_1b_1+c_2b_2)=c_1^2Var(b_1)+c_2^2Var(b_2)+2c_1c_2Cov(b_1,b_2)$$
+
+We can obtain the variance-covariance matrix using the `vcov` function
+in R:
+
+```{r}
+vc = vcov(m) # variance-covariance matrix
+vc
+```
+
+In this case,
+$SE_{b_{x_2}-b_{x_1}} = \sqrt{Var_{x_1}+Var_{x_2}+2Cov(x_1,x_2)}$.
+Therefore, the standard error of the difference could be calculated as
+below:
+
+```{r}
+# the difference between the two unstandardized coefficients
+diff = abs(m$coefficients['x2'])-abs(m$coefficients['x1']) 
+var_x1 = vc[2,2] # variance
+var_x2 = vc[3,3] # variance
+cov_x1x2 = vc[3,2] # covariance
+se_diff = sqrt(var_x1+var_x2+2*cov_x1x2) # standard error of the difference
+z = diff/se_diff # z score
+names(z) = NULL
+z
+```
+
+It is less than 1.96, so it is not significant. We can use the following
+code to obtain the $p$ value:
+
+```{r}
+pvalue = pnorm(-abs(z))
+pvalue
+```
+
+We can do something even more interesting, such as to test whether
+$b_{x_1}>2.2$.
+
+```{r}
+diff=abs(m$coefficients['x1'])-2.2
+var_x1 = vc[2,2]
+var_2.2 = 0
+cov_x12.2 = 0
+se_diff = sqrt(var_x1+var_2.2+2*cov_x12.2)
+z = diff/se_diff
+names(z) = NULL
+pvalue = pnorm(-abs(z))
+c(z,pvalue)
+```
+
+Whether $b_{x_4=3}>2b_{x_4=2}$?
+
+```{r}
+diff=abs(m$coefficients['factor(x4)3']-2*m$coefficients['factor(x4)2'])
+var_x43 = vc[6,6]
+var_x42 = vc[5,5]
+cov_x4 = vc[5,6]
+se_diff = sqrt(var_x43+4*var_x42+4*cov_x4)
+z = diff/se_diff
+names(z) = NULL
+pvalue = pnorm(-abs(z))
+c(z,pvalue)
+```
+
+Will standardization of variables change the variance-covariance matrix?
+
+```{r}
+summary(m1<-lm(y~x1+x2,data = data))
+
+# standardized all variables
+y_s = (data$y-mean(data$y))/sd(data$y) 
+x1_s = (data$x1-mean(data$x1))/sd(data$x1)
+x2_s = (data$x2-mean(data$x2))/sd(data$x2)
+summary(m2<-lm( y_s ~ x1_s+x2_s-1)) # without intercept
+lm.beta(m2)
+```
+
+The coefficients in the regression model based on the standardized
+variables (m2) are equal to the standardized coefficients. Check the
+variance-covariance matrices:
+
+```{r}
+vcov(m1)
+vcov(m2)
+```
+
+They are different. Any implications?
+
+### 11. Why is the I.I.D. assumption essential?
+
+A regression model could be write as a combination of two parts: random
+part + systematic part.
+
+$$Y_i \sim {\sf Norm}(\mu_i,\sigma)$$ $$\mu_i = X_i\beta_1 + \beta_0$$
+
+I.I.D refers to independent and identical distribution.
+
+-   Each draw from the bag must be independent. This means that the
+    value you get on one draw does not depend in any way on other draws.
+    Not repeated measures.
+
+-   Each observation is drawing from the same bag. In other words, you
+    are drawing values from the same distribution. The shape of this
+    distribution does not matter, even though some people will claim
+    that it must be normally distributed. However, regardless of the
+    shape, all observations must be drawing from an identically shaped
+    distribution.
+
+### 12. What if residuals are normally distributed, but the dependent variable is not? Is this possible?
+
+Let's create a variable y that is determined by two skewed variables and
+a normally distributed random error.
+
+```{r}
+x1 = rexp(1000,1.5)
+x2 = rweibull(1000,0.5)
+y = 7*x1+2*x2+rnorm(1000)
+hist(y)
+summary(lm(y~x1+x2))
+```
+
+As you can see, the dependent variable is skewed while the OLS
+regression estimated the coefficients correctly. The assumption is not
+about the shape of the dependent variable but how the random error of
+generating the dependent variable (the random part in the generation
+process).
+
+### 13. Why effect size is important? Is it true that larger coefficients indicate larger effect sizes? How to measure the unique effect of an independent variable on the dependent variable without any confounding effects of other independent variables (or can stepwise regression models solve the problem)?
+
+```{r}
+summary(m)
+betas
+```
+
+There are many effect size
+[measures](https://www.spss-tutorials.com/effect-size/). $\beta$ could
+be used as effect size, but it is really hard to interpret. In
+regression models, $R^2$ is most intuitive (variance explained), but it
+is a overall measure.
+
+**Squared Semi-partial correlation** ($sr^2$) tells us how much of the
+unique contribution of an independent variable to the total variation in
+dependent variable. In other words, it explains increment in R-square
+($\Delta R^2$) when an independent variable is added.
+
+```{r}
+a = summary(lm(y~x3+factor(x4),data))$r.squared #0.18
+b = summary(lm(y~x1+x3+factor(x4),data))$r.squared #0.27
+deta = b-a
+deta
+```
+
+Therefore, $x_1$ increased $R^2$ by `r deta`?
+
+```{r}
+c = summary(lm(y~x1+x2+x3+factor(x4),data))$r.squared #0.98
+deta2 = c-b
+deta2
+```
+
+Therefore, $x_2$ increased $R^2$ by `r deta2`? Why is this method
+problematic? Let's change the input order...
+
+```{r}
+cor.test(data$x1,data$x2)
+b_ = summary(lm(y~x2+x3+factor(x4),data))$r.squared
+b_-a # variance x2 explained
+c - b_ # variance x1 explained
+```
+
+It's a different story, which suggests that $x_1$ increased $R^2$ by
+`r c-b_`, while $x_2$ $R^2$ by `r b_-a`. The correct way to calculate
+the **Squared Semi-partial correlation** ($sr^2$) is to use the
+"one-less" approach:
+
+-   fit the full model with all predictors and calculate the overall
+    $R^2_full$
+
+-   remove one predictor ($x_i$) from the full model and then fit the
+    "one-less" model
+
+-   calculate the $R^2_{(i)}$ for the "one-less" model and
+    $\Delta R^2_i = R^2_full - R^2_{(i)}$
+
+```{r}
+# total
+ovall = summary(lm(y~x1+x2+x3+factor(x4),data))$r.squared 
+
+# one less by removing x1 from m
+ovall - summary(lm(y~x2+x3+factor(x4),data))$r.squared
+
+# one less by removing x2 from m
+ovall - summary(lm(y~x1+x3+factor(x4),data))$r.squared
+
+# one less by removing x3 from m
+ovall - summary(lm(y~x1+x2+factor(x4),data))$r.squared
+
+# one less by removing x4 from m
+ovall - summary(lm(y~x1+x2+x3,data))$r.squared
+```
+
+In fact, $x_1$ can explain
+`r ovall - summary(lm(y~x2+x3+factor(x4),data))$r.squared` variance. Why
+is the sum of all $R^2s$ larger than 100%?
+
+### 14. Is it possible to estimate the main effects from a regression model with interaction terms?
+
+Let's fit a model with interaction:
+
+```{r}
+summary(full <- lm(y~x1*x3+x2,data))
+```
+
+Can we say that the main effect of $x_1$ is
+`r round(full$coefficients["x1"],digits=2)`?
+
+When $x_3=0$:
+
+```{r}
+summary(lm(y~x1*x3+x2,data[data$x3==0,]))
+```
+
+When $x_3=1$,
+
+```{r}
+summary(lm(y~x1*x3+x2,data[data$x3==1,]))
+```
+
+It demonstrates that it is not the main effect but the effect when
+$x_3=0$. The main effects could be obtained in the following ways (the
+real value is in between):
+
+```{r message=FALSE,warning=FALSE}
+# margins based on the full model
+library(margins)
+margins(full)
+
+# fit a model without interaction term
+summary(lm(y~x1+x2+x3,data))
+```
+
+The marginal effect represents the difference of (two) predictions for
+an (infinitesimal) change in $x$ (the focal term). The average marginal
+effect represents the average slope of that predictor. In other words:
+the average marginal effects is one value per parameter (term), thus it
+can be considered as an **adjusted regression coefficient**, while
+predicted values usually predict the average outcome for different
+values of $x$ - you usually don’t have just one coefficient in the
+latter case that represents the overall effect of $x$.
+
+\newpage
+
+## IV. Regression (GLM)
+
+### 15. How to deal with non-normally distributed dependent variables? How to interpret the coefficients?
+
+As mentioned in section III, there are many regression models in
+addition to OLS regression. Most regression models could be expressed as
+the combination of a random plus a systematic part to generate the
+dependent variable. As we presented in Q11, the dependent
+variable in OLS regression is generated according to a normal
+distribution and the *mean* varies with other predictors systematically.
+In this sense, as long as we know the generating process (or underlying
+distribution) of the dependent variable, we can model the data in a
+regression form. We call them Generalized Regression Models (GLMs). Some
+commonly used models include:
+
+-   Logistic Regression (DV is a binary variable, which is generated
+    from a Bernoulli distribution)
+
+-   Poisson Regression (DV is a count variable, which is generated from
+    a Poisson distribution)
+
+-   Negative Binomial (DV is a over-dispersed count variable, which is
+    generated from a Negative Binomial distribution)
+
+-   Beta Regression (DV is a percentage/proportion variable, which is
+    generated from a Beta distribution)
+
+**Logistic Regression**
+
+$$Y_i \sim {\sf Bern}(\pi_i)$$
+$${\sf logit}(\pi_i)=\log(\frac{\pi_i}{1-\pi_i}) = X_i\beta_1 + \beta_0$$
+
+In logistic regression, the dependent variable $Y_i$ is generated from a
+Bernoulli distribution with a single parameter $\pi_i$, which is the
+probability of occurrence (the event of interest). The **link function**
+is logit (not log). It connects the predictors $X_i$ to the parameter
+$\pi_i$.
+
+$\beta_0$ is the log odds of the event of interest, when $X_i=0$,
+$e^{\beta_0}$ is the odds. $\beta_1 = \log(odds_{x+1}-\log(odds_x)$, or
+$e^{\beta_1} = \frac{odds_{x+1}}{odds_x}$. It reflects the change in log
+odds.
+
+```{r}
+# load the admission data for an example
+mydata <- read.csv("https://stats.idre.ucla.edu/stat/data/binary.csv")
+head(mydata)
+```
+
+The `glm` function in R can fit most generalized linear models. For
+logistic regression, we set the `family = "binomial"`:
+
+```{r message=FALSE,warning=FALSE}
+library(jtools)
+mylogit <- glm(admit ~ gre + gpa + factor(rank), data = mydata, family = "binomial")
+jtools::summ(mylogit)
+```
+
+The `jtools::summ` function are extremely useful when you want to obtain
+the *Pseudo-R^2^*. Since the relationships in logistic regression are
+non-linear. Usually, they are less intuitive to be interpreted. We can
+use the `margins` and `ggpredict` to estimate the predicted
+probabilities, which will help us to interpret the results.
+
+```{r message=FALSE,warning=FALSE}
+library(margins)
+library(ggeffects)
+
+margins(mylogit,variables = "rank")
+ggpredict(mylogit,terms = "rank")
+```
+
+For example, the marginal effects report that compare to rank1, rank2's
+probability to be admitted is 15.7% lower.
+
+**Poisson Regression**
+
+$$Y_i \sim {\sf Pois}(\lambda_i)$$
+$$\log(\lambda_i) = X_i\beta_1 + \beta_0$$ $\beta_0$ is the logged
+average of $Y$, when $X_i=0$. $e^{\beta_0}$ is the average of $Y$.
+$\beta_1=\log(\lambda_{x+1})-\log(\lambda_x)$, or
+$e^{\beta_1} = \frac{\lambda_{x+1}}{\lambda_x}$.
+
+```{r}
+head(warpbreaks)
+mypois <-glm(breaks ~ wool+tension, data = warpbreaks,family = poisson)
+summ(mypois)
+```
+
+**Negative Binomial**:
+
+$$Y_i \sim {\sf NegBin}(\mu_i,r)$$
+$$\log(\mu_i) = X_i\beta_1 + \beta_0$$
+
+Both Poisson regression and Negative Binomial regression are models for
+count data. Therefore, the interpretation of coefficients of Negative
+Binomial is similar to that of Poisson regression. The difference is
+that $E(Y)=Var(Y)$ in Poisson distribution, while $E(Y) \neq Var(Y)$ in
+Negative Binomial distribution. This is governed by the dispersion
+parameter $r$. For large reciprocal dispersion parameter $r$,
+$Var(Y) \approx E(Y)$, ${\sf NegBin} \to {\sf Pois}$. The Negative
+Binomial distribution is especially useful to model highly skewed data.
+
+Unfortunately, we cannot use `glm` to fit a Negative Binomial model.
+Instead, we need to use `glm.nb` function from the `MASS` package:
+
+```{r message=FALSE,warning=FALSE}
+library(MASS)
+library(haven) # to read stata data
+dat <- read_stata("https://stats.idre.ucla.edu/stat/stata/dae/nb_data.dta")
+head(dat)
+hist(dat$daysabs)
+```
+
+```{r}
+summ(mynegbin <- glm.nb(daysabs ~ math + prog, data = dat))
+```
+
+The theta parameter estimated above is the dispersion parameter. Note
+that R parameterizes this differently from SAS, Stata, and SPSS. The R
+parameter (theta) is equal to the inverse of the dispersion parameter
+estimated in these other software packages. Thus, the theta value of
+1.022 seen here is equivalent to the 0.978 because 1/1.022 = 0.978.
+
+**Beta Regression**
+
+$$Y_i \sim {\sf Beta}(\mu_i,\phi)$$
+$${\sf logit}(\mu_i) = \log(\frac{\mu_i}{1-\mu_i}) = X_i\beta_1 + \beta_0$$
+
+Beta regression also uses logit as the link function. The distribution
+ranges from 0 to 1 (0 and 1 are not usually excluded). Therefore, it is
+useful to model percent and proportion data. We use `betareg` to fit the
+model. The parameter $\phi$ is a precision parameter: the higher $\phi$
+the lower the variance for given *mean* $\mu$.
+
+```{r message=FALSE,warning=FALSE}
+library(betareg)
+data("FoodExpenditure", package = "betareg")
+head(FoodExpenditure)
+```
+
+```{r}
+# food/income is a proportion
+mybeta <- betareg(I(food/income) ~ income + persons, data = FoodExpenditure)
+summary(mybeta)
+```
+
+```{r}
+margins(mybeta)
+```
+
+Therefore, one more person leads to 2.4% increase in food consumption
+given the income (food/income).
+
+### 16. Can we model the variance of the dependent variable instead of the mean? For example, the variance of the salaries of older individuals is smaller than that of younger individuals, given equal salary levels.
+
+Recall the expression for normal regression. We simply change the
+systematic part by including $\sigma$:
+
+$$Y_i \sim {\sf Norm}(\mu,\sigma_i)$$
+$$\sigma_i = X_i\beta_1 + \beta_0$$
+
+In fact, we can model both $\mu_i$ and $\sigma_i$ simultaneously. We can
+fit the models using the `gamlss` (Generalized Additive Models for
+Location, Scale and Shape) package in R ([see more example
+here](https://www.r-bloggers.com/2021/09/why-and-how-to-model-conditional-variance-with-an-application-to-my-letterboxd-data/)).
+
+```{r message=FALSE,warning=FALSE}
+library(gamlss)
+head(mtcars)
+```
+
+Let's fit an OLS regression model:
+
+```{r}
+summ(lm(mpg~hp+wt,mtcars),model.info = FALSE, model.fit = FALSE)
+```
+
+Model $\sigma$ using `gamlss`. There are two formulas, one for the
+*mean* and another for the *standard deviation*. Set the first part as
+in `lm`. If you really believe that the *mean* is not related to other
+variables, `~1` indicates that only the intercept is included in the
+model (thus is a constant). The second part is `sigma.formula`, using
+`=~` to specify the predictors. You can choose the distribution family,
+allowing you to go beyond just normal distributions. Here,
+`family = NO()`, indicating a Normal distribution.
+
+```{r}
+myglass1 = gamlss(mpg~1,sigma.formula = ~ hp+wt, family = NO(),
+                 data=mtcars,
+                 control = gamlss.control(trace=FALSE))
+myglass2 = gamlss(mpg~hp+wt,sigma.formula = ~ hp+wt, family = NO(),
+                 data=mtcars,
+                 control = gamlss.control(trace=FALSE))
+summary(myglass1)
+summary(myglass2)
+```
+
+Another (maybe more intuitive/flexible) way is to use Bayes approach. It
+is easy to set the model using the `brms` package in R. The code turns
+out to be very slow. Please run it at your own risk.
+
+```{r,message=FALSE,warning=FALSE}
+# library(brms)
+# myBayes <- brm(bf(mpg ~ hp + wt, sigma ~ hp+wt),
+#             data = mtcars,
+#             family = gaussian)
+# summary(myBayes)
+```
+
+### 17. What are the problems with using Z-statistics and their associated p-values for the coefficients of multiplicative terms when testing for statistical interactions in nonlinear models with categorical dependent variables, such as logistic regression?
+
+In linear models, the interaction term tests the difference between the
+two slopes. However, interactions in non-linear models (e.g., logistic
+regression) could be more complicated. Critically, in binary probit and
+logit, the equality of regression coefficients across groups does not
+imply that the marginal effects of a predictor on the probability are
+equal (Long & Mustillo, 2021).
+
+```{r}
+# generate a data set with binary y
+x <- rnorm(1000)
+m <- rnorm(1000)
+prob <- binomial(link = "logit")$linkinv(.25 + .3*x + .3*m + -.5*(x*m) + rnorm(1000))
+y <- rep(0, 1000)
+y[prob >= .5] <- 1
+summ(logit_fit <- glm(y ~ x * m, family = binomial),model.info = FALSE, model.fit = FALSE) 
+```
+
+The interaction term $x:m$ is significant. However, due to the
+non-linear (log) transformation, the slope differs at different values
+for $x$, thus, the **marginal effect** or **association** (in terms of
+probabilities) is not constant across values of $x$. Let's plot out the
+interaction effect:
+
+```{r message=FALSE,warning=FALSE}
+library(interactions)
+interact_plot(logit_fit, pred = x, modx = m, interval = T)
+```
+
+Let's calculate the marginal effect for $x$:
+
+```{r message=FALSE,warning=FALSE}
+summary(ef <- margins(logit_fit))
+```
+
+On average, a unit-change in $x$ changes the predicted probability that
+the outcome equals 1 by `r round(summary(ef)$AME['x'],digits=2)` [(see
+here)](https://strengejacke.github.io/ggeffects/articles/introduction_marginal_effects.html#marginal-effects-and-predictions-1).
+
+It might be less intuitive to interpret average marginal effects, in
+particular for non-Gaussian models, because it is harder to understand
+an average effect where we actually have varying effects across the
+range of the focal term. Instead, it would be better to look at
+predictions at different values of the focal term(s), which is what
+`ggeffects` returns by default:
+
+```{r message=FALSE,warning=FALSE}
+ggpredict(logit_fit, "x")
+```
+
+The non-linear relationship makes the interaction effect vary. We can
+estimate the marginal effects (of $x$) based on different levels of the
+moderator ($m$):
+
+```{r}
+summary(margins(logit_fit,at = list(m=c(-2.5,0,2.5)),variables = "x"))
+```
+
+Or we can formally conduct the [Johnson-Neyman intervals and simple
+slopes analysis](https://interactions.jacob-long.com/). The “classic”
+way of probing an interaction effect is to calculate the slope of the
+focal predictor at different values of the moderator. When the moderator
+is binary, this is especially informative, e.g., what is the slope for
+men vs. women? But you can also arbitrarily choose points for continuous
+moderators.
+
+With that said, the more statistically rigorous way to explore these
+effects is to find the **Johnson-Neyman interval**, which tells you the
+range of values of the moderator in which the slope of the predictor is
+significant vs. nonsignificant at a specified alpha level.
+
+The `sim_slopes` function will by default find the **Johnson-Neyman
+interval** and tell you the predictor’s slope at specified values of the
+moderator; by default either both values of binary predictors or the
+mean and the mean +/- one standard deviation for continuous moderators.
+
+```{r}
+sim_slopes(logit_fit,pred = x, modx = m, jnplot = TRUE)
+```
+
+\newpage
+
+## V. Regression (Causal Inference)
+
+### 18. Everyone knows that correlation IS NOT causation. When can regression coefficients be interpreted as causal effects? Is including a lagged explanatory variable a viable option?
+
+Regression models have two different purposes. One is for description,
+another is for causal inference. For the purpose of description, we
+emphasize the overall fit (e.g., $R^2$). For the purpose of causal
+inference, we place more emphasis on the "accurate" estimation of a
+focal variable on the dependent variable (i.e., the treatment effect).
+So, a natural question is whether it is possible to estimate the
+treatment effect even though the overall model fit is not so good (e.g.,
+relatively low $R^2$).
+
+**Example 1 (independent)**: Let's create three random variables ($x_1$,
+$x_2$, and Treatment). They are independent to each other. The focal
+variable is "Treatment", while the dependent variable is created based
+on $x_1$ and Treatment.
+
+```{r}
+x1 = rnorm(1000,2,1)
+x2 = rnorm(1000,3,1)
+Treatment = rnorm(1000,5,2)
+y = 2*x1+3*Treatment+rnorm(1000)
+```
+
+We can run a regression model including all three variables as the
+predictors of $y$.
+
+```{r message=FALSE,warning=FALSE}
+library(jtools)
+summ(lm(y~x1+x2+Treatment),model.info = FALSE, model.fit = FALSE)
+```
+
+For sure, the $R^2$ is close to 1, and the coefficients are close to the
+true values. How about if only regress Treatment on y (imaging that we
+have no way to observe or measure $x_1$)?
+
+```{r}
+summ(lm(y~Treatment),model.info = FALSE, model.fit = FALSE)
+```
+
+The coefficient of Treatment on $y$ remains accurate, when other
+predictors are independent to Treatment.
+
+**Example 2 (dependent)**: Let's create three random variables. This
+time, $x_1$ is positively correlated with $x_2$. Actually $x_1$ leads to
+$x_2$ ($x_1 \to x_2$). Treatment is negatively dependent on $x_2$
+($x_2 \to$Treatment).
+
+<center>
+
+![Causal Graph.](F1.jpg)
+
+</center>
+
+```{r}
+x1 = rnorm(1000,2,1)
+x2 = 3.1*x1 + rnorm(1000)
+Treatment = -0.9*x2 + rnorm(1000)
+y = 2*x1+3*Treatment+rnorm(1000)
+summ(lm(y~Treatment+x1+x2),model.info = FALSE, model.fit = FALSE)
+```
+
+If we measured all predictors ($x_1$, $x_2$, and Treatment) and included
+them correctly in the regression model, the estimated coefficient of
+Treatment should be accurate as presented above. If we miss both $x_1$
+and $x_2$, the estimated effect of Treatment will be biased:
+
+```{r}
+summ(lm(y~Treatment),model.info = FALSE, model.fit = FALSE)
+```
+
+How can we correct the bias? Is it necessary to control for both $x_1$
+and $x_2$? The answer is "no".
+
+```{r message=FALSE,warning=FALSE}
+m0 <- lm(y~Treatment+x2)
+m1 <- lm(y~Treatment+x1)
+export_summs(m0,m1)
+```
+
+Both models can estimate the treatment effect correctly (However, the
+estimation of $x_i$ is biased). Why? This is rooted in the so-called
+[**Backdoor
+Criterion**](https://medium.data4sci.com/causal-inference-part-xi-backdoor-criterion-e29627a1da0e)
+in causal inferences: Given an ordered pair of variables (X, Y) in a
+directed acyclic graph G, a set of variables Z satisfies the backdoor
+criterion relative to (X, Y) if no node in Z is a descendant of X, and Z
+blocks every path between X and Y that contains an arrow into X.
+
+Question:
+
+-   Why do we also consider demographics (age/gender) as control
+    variables? ([exogenous
+    variables](https://en.wikipedia.org/wiki/Exogenous_and_endogenous_variables)
+    without any arrow directed to them)
+
+**Example 3 (lagged variable)**: If we don't know either x1 or x2, is a
+lagged variable of the Treatment sufficient to identify the causal
+effect? It works in some special conditions only!
+
+<center>
+
+![Another Causal Graph.](F2.jpg)
+
+</center>
+
+Note that $x_{t0}$ and $x_{t1}$ are unobservable.
+
+```{r}
+# two independent confounding variables
+x_t0 = rnorm(1000,1,1.5)
+x_t1 = rnorm(1000,2,1.5)
+
+# treatment and its lagged variable [simultaneous influences from x on treatment]
+Treatment_t0 = 1.5*x_t0 + rnorm(1000,3,1.2)
+Treatment_t1 = 2*Treatment_t0 + 1.5*x_t1 + rnorm(1000) # lagged var. should be auto-correlated
+
+# define y
+y = 2*Treatment_t1 + 3*x_t1 + rnorm(1000) # the treatment effect is 2
+
+summ(lm(y~Treatment_t1+Treatment_t0),model.info = FALSE, model.fit = FALSE)
+```
+
+No! The estimated effect of Treatment_t01 is bias. Notice that x_t0
+actually is an [**instrumental
+variable**](https://en.wikipedia.org/wiki/Instrumental_variables_estimation)
+of x_t1 -\> y. We need to use two stage least square regression (or IV
+regression) to estimate the treatment effect.
+
+```{r message=FALSE,warning=FALSE}
+library(ivreg)
+summary(ivreg(y~Treatment_t1|Treatment_t0))
+```
+
+The coefficient is very close to the true value 2. So, is this the
+solution? No, because it is very unlikely x_t0 is not correlated in
+x_t1. And it is likely that x_t0 can influence y directly (cross-lagged
+influence).
+
+<center>
+
+![Revised Causal Graph.](F3.jpg)
+
+</center>
+
+```{r}
+# confounding variables
+x_t0 = rnorm(1000,1,1.5)
+x_t1 = 1.8*x_t0+rnorm(1000) #x_t0->x_t1
+
+# treatment and its lagged variable [simultaneous influences from x on treatment]
+treatment_t0 = 1.5*x_t0 + rnorm(1000,3,1.2)
+treatment_t1 = 2*treatment_t0 + 1.5*x_t1 + rnorm(1000) # lagged var. should be auto-correlated
+
+# define y
+y = 2*treatment_t1 + 3*x_t1 + rnorm(1000)
+
+summ(lm(y~treatment_t1+treatment_t0),model.info = FALSE, model.fit = FALSE)
+summary(ivreg(y~treatment_t1|treatment_t0))
+```
+
+Both `lm` and `ivreg` are incorrect! How about if x does not change over
+time, i.e., x_t0 = x_t1.
+
+```{r}
+# confounding variables
+x = rnorm(1000,3,1.5)
+
+# treatment and its lagged variable [simultaneous influences from x on treatment]
+treatment_t0 = 1.5*x + rnorm(1000,3,1.2)
+treatment_t1 = 2*treatment_t0 + 1.5*x + rnorm(1000) # lagged var. should be auto-correlated
+
+# define y
+y = 2*treatment_t1 + 3*x + rnorm(1000)
+
+summ(lm(y~treatment_t1+treatment_t0),model.info = FALSE, model.fit = FALSE)
+```
+
+It does not work!
+
+### 19. Are RCTs always better than observational methods to identify causality?
+
+-   Plausibility and ethics: sex manipulation?
+-   Experiments also have assumptions: Randomization rules out all
+    confounding variables
+-   [Compliance](https://en.wikipedia.org/wiki/Compliance_(psychology))
+-   Heterogeneous effects (lack of external validity):
+
+Suppose the treatment effect (conditions) varies across gender
+(`gender*cond`).
+
+```{r}
+cond = sample(c(0,1),1000,replace = T)
+gender = sample(c(0,1),1000,replace = T)
+y = 2*cond -1*gender*cond + rnorm(1000)
+
+pp = data.frame(y,cond,gender)
+# a random experiment based on population
+table(pp$cond)/1000
+table(pp$gender)/1000
+summ(lm(y~cond,data = pp),model.info = FALSE, model.fit = FALSE)
+```
+
+It does not influence the estimation of the treatment effect if we have
+a representative sample. However, it does not work with a biased sample.
+
+```{r}
+# a random experiment from a biased sample
+male = pp[pp$gender==1,]
+female = pp[pp$gender==0,]
+ps = rbind(male[sample(nrow(male),400),],female[sample(nrow(female),100),])
+
+table(ps$cond)/500
+table(ps$gender)/500
+summ(lm(y~cond,data = ps),model.info = FALSE, model.fit = FALSE)
+```
+
+### 20. Is it always better to control more variables than less? Should we remove non-significant variables from the regression?
+
+**Collider**: $x_1 \rightarrow x \leftarrow y$. Don't control for
+colliders. Controlling for colliders creates spurious correlations.
+
+```{r}
+x1 = rnorm(1000)
+x2 = rnorm(1000)
+y = 3.5*x2 + rnorm(1000)
+
+x = 3*x1+2*y+rnorm(1000) # x is a collider
+
+m0 <- lm(y~x1+x2) # correct (x1 does not influence y)
+m1 <- lm(y~x1+x2+x) # wrong (x1 influences y conditioning on x)
+export_summs(m0,m1)
+```
+
+Here, $x$ is significantly correlated with both $y$ and $x_1$. However,
+$x$ should not be included in the regression model $m1$. It makes the
+irrelevant variable $x_1$ now correlated with $y$ significantly.
+
+A related question, should we include non-significant variables? If $x$
+is an irrelevant variable (to $y$):
+
+```{r}
+x1 = rnorm(1000)
+x2 = rnorm(1000)
+# if x is really irrelevant but correlated with x1 and x2
+x = 2.5*x1+3.5*x2+rnorm(1000)
+y = 2.5*x1 +3.5*x2 + rnorm(1000)
+
+m0 <- lm(y~x1+x2+x)
+m1 <- lm(y~x1+x2)
+export_summs(m0,m1)
+```
+
+The example demonstrated that if $x$ is really not related to y (not
+caused by sampling or estimation in models), there are just some minor
+differences with or without including $x$. It is always safe to include
+all variables, because usually we don't know whether the insignificant
+variables are really non-relevant to $y$.
+
+Nevertheless, there are some (minor) drawbacks by including really
+non-relevant variables: it will decrease $df$, increase $SE$! Not
+parsimony! If $x$ is NOT correlated with $x_1$ and $x_2$, $SE$s will not
+change much (why?).
+
+One more example, x is indeed related to y, however, the effect size is
+small and thus it might be nonsignficant in the regression.
+
+```{r}
+x1 = rnorm(1000,3,1)
+x2 = rnorm(1000,5,2)
+x = 3*x1+2*x2+5*rnorm(1000)
+y = 2*x1 + 3*x2 + 0.02*x+ rnorm(1000,6,2.5)
+
+m0 <- lm(y~x1+x2+x) # x is not significant but it is relevant 
+m1 <- lm(y~x1+x2) # removing the variable will bias the estimation
+export_summs(m0,m1)
+```
+
+\newpage
+
+### 21. Should we control for mediators to estimate the treatment effect?
+
+-   direct effects
+-   indirect effects
+-   total effects = direct + indirect effects
+
+```{r}
+x = rnorm(1000,5,1)
+m = 2*x+3*rnorm(1000)
+y = 3*x+5*m+7*rnorm(1000,6,3)
+
+# the traditional way of mediation test:
+m0 <- lm(y~x)
+m1 <- lm(y~x+m)
+export_summs(m0,m1)
+```
+
+The tradition way of mediation test is to compare the regression models
+with/without the mediator (i.e., `m0`, `m1`). Without mediator in `m0`,
+the coefficient of x is `r round(m0$coefficients['x'],digits=2)`, while
+it is `r round(m1$coefficients['x'],digits=2)` in `m1`, indicating the
+existence of partially mediation. This method is not precise, without
+estimation of the size and test of significance. It would be better to
+estimate using the *SEM* approach.
+
+\newpage
+
+```{r message=FALSE,warning=FALSE,cache=FALSE}
+library(lavaan)
+data = data.frame(y,x,m)
+mod <- "# a path
+         m ~ a * x
+
+         # b path
+         y ~ b * m
+
+         # c direct path 
+         y ~ c * x
+
+         # indirect and total effects
+         ab := a * b
+         total := c + ab"
+
+fsem <- sem(mod, data = data, se = "bootstrap", bootstrap = 1000)
+summary(fsem)
+```
+
+The total effect is `r round(m0$coefficients['x'],digits=2)`, which is
+consistent with `m0`. This is the overall treatment effect. `ab` is the
+indirect effect (the effect of x on y via m). It is possible that x
+could influence y via many mechanisms. Unless, you're interested in a
+particular mechanism, we estimate the treatment effect without
+controlling for mediators.
