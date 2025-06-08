@@ -19,14 +19,14 @@ The Chinese University of Hong Kong </br>
 #### 9. How to interpret regression coefficients (direction, magnitude/strength, significance, form)? How do we interpret when predictors are categorical? How to compare regression coefficients?
 #### 10. Why is the I.I.D. assumption essential? 
 #### 11.	What if residuals are normally distributed, but the dependent variable is not? Is this possible?
-#### 12.	Why effect size is important? Is it true that larger coefficients indicate larger effect sizes? How do we measure the unique effect of an independent variable on the dependent variable without any confounding effects of other independent variables (or can stepwise regression models solve the problem)?
+#### 12.	Why is the effect size important? Is it true that larger coefficients indicate larger effect sizes? How do we measure the unique effect of an independent variable on the dependent variable without any confounding effects of other independent variables (or can stepwise regression models solve the problem)?
 #### 13.	Is estimating the main effects from a regression model with interaction terms possible? 
 ### IV.	Regression (GLM)
 #### 14. How do we deal with non-normally distributed dependent variables? How do we interpret the coefficients?
 #### 15. Can we model the variance (instead of the mean) of the dependent variable? E.g., the variance in the salary of older people is smaller than that of young people, given equal salary.
 #### 16. What is wrong with using Z-statistics (and associated p-values) of the coefficient of a multiplicative term to test for a statistical interaction in nonlinear models with categorical dependent variables (e.g., logistic regression)?
 ### V.	Regression (Causal Inference)
-#### 17. Everyone knows that correlation is not causation, when regression coefficients could be interpreted as causal effects? Is including the lagged explanatory variable a solution?
+#### 17. Everyone knows that correlation is not causation, but when can regression coefficients be interpreted as causal effects? Is including the lagged explanatory variable a solution?
 #### 18. Is a random experiment always better than other methods to identify causality? Why or why not?
-#### 19. Is it always better to control more variables than less? Should we remove non-significant variables from the regression?
+#### 19. Is it always better to control more variables than fewer? Should we remove non-significant variables from the regression?
 #### 20.	Should we control for mediators to estimate the treatment effect?
